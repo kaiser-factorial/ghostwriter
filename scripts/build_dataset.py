@@ -131,6 +131,10 @@ def main():
     ap.add_argument("--val-frac", type=float, default=0.02)
     ap.add_argument("--pepys-char-budget", type=int, default=900_000,
                     help="Max characters of Pepys to keep (he is 10x the others raw)")
+    ap.add_argument("--chunk-prob", type=float, default=0.25,
+                    help="Probability of grouping sequential entries into a multi-day chunk")
+    ap.add_argument("--chunk-max-size", type=int, default=4,
+                    help="Max number of entries in a temporal chunk")
     args = ap.parse_args()
     rng = random.Random(args.seed)
     args.out_dir.mkdir(parents=True, exist_ok=True)
@@ -138,26 +142,54 @@ def main():
     docs_train, docs_val, stats = [], [], {}
     for p in PERSONAS:
         entries = [json.loads(l) for l in (args.clean_dir / f"{p}.jsonl").open()]
+        
+        # Tag original order to restore chronological order after subsampling
+        for idx, e in enumerate(entries):
+            e["_idx"] = idx
+            
         if p == "pepys":
             entries = subsample_pepys(entries, args.pepys_char_budget, rng)
-        rng.shuffle(entries)
-        n_val = max(2, int(len(entries) * args.val_frac))
-        val, train = entries[:n_val], entries[n_val:]
-        for split_entries, sink in ((train, docs_train), (val, docs_val)):
-            for e in split_entries:
-                use_persona = rng.random() < args.persona_token_prob
-                prompt = rng.choice(GENERIC_PROMPTS) if rng.random() < args.prompt_frac else None
-                sink.append({
-                    "text": format_doc(e, use_persona, prompt),
-                    "persona": e["persona"],
-                    "has_persona_token": use_persona,
-                    "has_prompt": prompt is not None,
-                })
+            entries.sort(key=lambda x: x["_idx"])
+
+        chunks = []
+        i = 0
+        while i < len(entries):
+            if rng.random() < args.chunk_prob:
+                chunk_sz = rng.randint(2, args.chunk_max_size)
+            else:
+                chunk_sz = 1
+                
+            chunk = entries[i:i+chunk_sz]
+            if not chunk:
+                break
+                
+            use_persona = rng.random() < args.persona_token_prob
+            prompt = rng.choice(GENERIC_PROMPTS) if rng.random() < args.prompt_frac else None
+            
+            formatted_texts = []
+            for j, e in enumerate(chunk):
+                formatted_texts.append(format_doc(e, use_persona, prompt if j == 0 else None))
+                
+            chunks.append({
+                "text": "".join(formatted_texts),
+                "persona": p,
+                "has_persona_token": use_persona,
+                "has_prompt": prompt is not None,
+                "num_entries": len(chunk)
+            })
+            i += chunk_sz
+            
+        rng.shuffle(chunks)
+        n_val = max(2, int(len(chunks) * args.val_frac))
+        val, train = chunks[:n_val], chunks[n_val:]
+        docs_train.extend(train)
+        docs_val.extend(val)
+        
         chars = sum(len(e["text"]) for e in entries)
-        stats[p] = {"entries": len(entries), "chars": chars,
-                    "train": len(train), "val": len(val)}
-        print(f"[dataset] {p:10s} kept={len(entries):4d} chars={chars:8,d} "
-              f"(train {len(train)} / val {len(val)})")
+        stats[p] = {"entries": len(entries), "chunks": len(chunks), "chars": chars,
+                    "train_chunks": len(train), "val_chunks": len(val)}
+        print(f"[dataset] {p:10s} kept={len(entries):4d} entries -> {len(chunks)} chunks "
+              f"chars={chars:8,d} (train {len(train)} / val {len(val)})")
 
     rng.shuffle(docs_train)
     for name, docs in (("train", docs_train), ("val", docs_val)):
@@ -169,12 +201,12 @@ def main():
     meta = {"personas": PERSONAS, "special_tokens": SPECIAL_TOKENS,
             "persona_token_prob": args.persona_token_prob,
             "prompt_frac": args.prompt_frac, "seed": args.seed,
+            "chunk_prob": args.chunk_prob, "chunk_max_size": args.chunk_max_size,
             "approx_tokens": n_tok, "stats": stats,
             "generic_prompts": GENERIC_PROMPTS}
     (args.out_dir / "meta.json").write_text(json.dumps(meta, indent=2))
     print(f"[dataset] train={len(docs_train)} val={len(docs_val)} docs, "
           f"~{n_tok:,} tokens -> {args.out_dir}")
-
 
 if __name__ == "__main__":
     main()

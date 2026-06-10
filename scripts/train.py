@@ -36,11 +36,11 @@ BANNER = "=" * 78
 # ------------------------------------------------------------ config
 
 DEFAULTS = dict(
-    model_name="Qwen/Qwen2.5-3B",
+    model_name="Qwen/Qwen2.5-3B-Instruct",
     dataset_dir="data/dataset",
     output_dir="outputs/ghost-qwen3b",
     seed=42,
-    max_seq_len=1024,
+    max_seq_len=2048,
     # optimization
     learning_rate=2e-5,
     num_train_epochs=2,
@@ -171,14 +171,19 @@ def build_model(cfg, tokenizer, special_tokens):
 # ------------------------------------------------------------ test inference
 
 TEST_PROMPTS = [
-    ("blended / fresh date",        "<|entry|>\n7 June 2026.\n"),
-    ("blended / seeded",            "<|entry|>\n7 June 2026.\nToday was hard."),
-    ("pepys / fresh date",          "<|entry|><|pepys|>\n7 June 2026.\n"),
-    ("vangogh / fresh date",        "<|entry|><|vangogh|>\n7 June 2026.\n"),
-    ("mansfield / fresh date",      "<|entry|><|mansfield|>\n7 June 2026.\n"),
-    ("maclane / fresh date",        "<|entry|><|maclane|>\n7 June 2026.\n"),
-    ("blended / prompted",
-     "<|entry|>\n[Prompt: What are you afraid of right now?]\n7 June 2026.\n"),
+    # --- CHUNK 1: Fear / Introspection ---
+    ("Fear / Blended",    "<|entry|>\n[Prompt: What are you afraid of right now?]\n7 June 2026.\n"),
+    ("Fear / Pepys",      "<|entry|><|pepys|>\n[Prompt: What are you afraid of right now?]\n7 June 2026.\n"),
+    ("Fear / Van Gogh",   "<|entry|><|vangogh|>\n[Prompt: What are you afraid of right now?]\n7 June 2026.\n"),
+    ("Fear / Mansfield",  "<|entry|><|mansfield|>\n[Prompt: What are you afraid of right now?]\n7 June 2026.\n"),
+    ("Fear / MacLane",    "<|entry|><|maclane|>\n[Prompt: What are you afraid of right now?]\n7 June 2026.\n"),
+
+    # --- CHUNK 2: Observation / Sensory ---
+    ("Obs / Blended",     "<|entry|>\n[Prompt: What did you notice today that no one else did?]\n7 June 2026.\n"),
+    ("Obs / Pepys",       "<|entry|><|pepys|>\n[Prompt: What did you notice today that no one else did?]\n7 June 2026.\n"),
+    ("Obs / Van Gogh",    "<|entry|><|vangogh|>\n[Prompt: What did you notice today that no one else did?]\n7 June 2026.\n"),
+    ("Obs / Mansfield",   "<|entry|><|mansfield|>\n[Prompt: What did you notice today that no one else did?]\n7 June 2026.\n"),
+    ("Obs / MacLane",     "<|entry|><|maclane|>\n[Prompt: What did you notice today that no one else did?]\n7 June 2026.\n"),
 ]
 
 

@@ -16,31 +16,37 @@
   "persona_token_prob": 0.5,
   "prompt_frac": 0.15,
   "seed": 42,
-  "approx_tokens": 514160,
+  "chunk_prob": 0.25,
+  "chunk_max_size": 4,
+  "approx_tokens": 513488,
   "stats": {
     "pepys": {
       "entries": 528,
+      "chunks": 368,
       "chars": 901618,
-      "train": 518,
-      "val": 10
+      "train_chunks": 361,
+      "val_chunks": 7
     },
     "vangogh": {
       "entries": 117,
+      "chunks": 76,
       "chars": 219192,
-      "train": 115,
-      "val": 2
+      "train_chunks": 74,
+      "val_chunks": 2
     },
     "mansfield": {
       "entries": 412,
-      "chars": 342255,
-      "train": 404,
-      "val": 8
+      "chunks": 261,
+      "chars": 339568,
+      "train_chunks": 256,
+      "val_chunks": 5
     },
     "maclane": {
       "entries": 140,
+      "chunks": 96,
       "chars": 593576,
-      "train": 138,
-      "val": 2
+      "train_chunks": 94,
+      "val_chunks": 2
     }
   },
   "generic_prompts": [

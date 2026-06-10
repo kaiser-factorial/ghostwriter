@@ -1,4 +1,4 @@
-# ghost-diary 👻📓
+# Ghostwriter 👻📓
 
 Fine-tune one small model on four dead diarists. Give it a date; a ghost
 writes the entry. With a persona token you summon one writer; without it,
@@ -11,7 +11,7 @@ letters) · **Katherine Mansfield** (1910s–20s journal) · **Mary MacLane**
 ## Quick start (RunPod or any CUDA box)
 
 ```bash
-git clone <this repo> && cd ghost-diary
+git clone <this repo> && cd Ghostwriter
 pip install -r requirements.txt
 
 # data is already built (data/dataset/), but to rebuild from raw:

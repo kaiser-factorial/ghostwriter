@@ -124,7 +124,6 @@ self-consistency experiment.
 
 1. Should synthetic dates be visually marked at inference (e.g., the model
    never sees real Van Gogh dates — is that fine for the aesthetic)?
-2. Is 1024 max_seq_len right? Pepys entries occasionally exceed it (they're
-   truncated by packing boundaries, which is harmless but lossy).
+2. ~~Is 1024 max_seq_len right?~~ (Resolved: Increased to 2048 to prevent truncating Pepys's longer entries).
 3. Blend default: is persona_token_prob=0.5 the right prior, or do you want
    the blend to be the *primary* artifact (→ lower it)?

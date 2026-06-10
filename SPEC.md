@@ -1,8 +1,8 @@
-# ghost-diary — SPEC
+# Ghostwriter — SPEC
 
 A séance conducted by gradient descent.
 
-**ghost-diary** fine-tunes a small language model (Qwen2.5-3B) on the diaries of
+**Ghostwriter** fine-tunes a small language model (Qwen2.5-3B) on the diaries of
 four dead writers so that, given a date, a ghost writes the day's entry. One
 model hosts four ghosts and a fifth emergent thing: prompted with a persona
 token it speaks in a single voice; prompted bare, it speaks as the *blend* —
@@ -24,7 +24,7 @@ Anaïs Nin, Plath, Alice James).
 ## Repository layout
 
 ```
-ghost-diary/
+Ghostwriter/
 ├── SPEC.md            ← you are here
 ├── HOW_TO.md          ← make your own ghost (general recipe)
 ├── CLAUDE_IDEAS.md    ← implemented + speculative ideas log
@@ -115,7 +115,7 @@ Config-driven (YAML over defaults; CLI `--config` to select). Key mechanics:
 - **Tokenizer surgery**: 6 special tokens added (`<|entry|>`, `<|/entry|>`,
   4 persona tokens); embeddings resized with **mean-initialization** of new
   rows (random init on a 3B model makes new tokens detonate early loss).
-- **Packing**: documents are concatenated and chunked to `max_seq_len` (1024)
+- **Packing**: documents are concatenated and chunked to `max_seq_len` (2048)
   so no compute is wasted on padding.
 - **Full fine-tune** by default on Qwen2.5-3B (bf16 + gradient checkpointing
   fits comfortably on a single A100/H100 and squeaks onto a 24GB 4090);
