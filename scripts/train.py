@@ -43,7 +43,7 @@ DEFAULTS = dict(
     max_seq_len=2048,
     # optimization
     learning_rate=2e-5,
-    num_train_epochs=2,
+    num_train_epochs=3,
     per_device_train_batch_size=4,
     gradient_accumulation_steps=4,
     warmup_ratio=0.03,
@@ -66,7 +66,7 @@ DEFAULTS = dict(
     # post-train test inference
     run_test_inference=True,
     test_max_new_tokens=200,
-    test_temperature=0.9,
+    test_temperature=0.92,
     test_top_p=0.95,
     test_repetition_penalty=1.05,
 )
@@ -172,18 +172,18 @@ def build_model(cfg, tokenizer, special_tokens):
 
 TEST_PROMPTS = [
     # --- CHUNK 1: Fear / Introspection ---
-    ("Fear / Blended",    "<|entry|>\n[Prompt: What are you afraid of right now?]\n7 June 2026.\n"),
-    ("Fear / Pepys",      "<|entry|><|pepys|>\n[Prompt: What are you afraid of right now?]\n7 June 2026.\n"),
-    ("Fear / Van Gogh",   "<|entry|><|vangogh|>\n[Prompt: What are you afraid of right now?]\n7 June 2026.\n"),
-    ("Fear / Mansfield",  "<|entry|><|mansfield|>\n[Prompt: What are you afraid of right now?]\n7 June 2026.\n"),
-    ("Fear / MacLane",    "<|entry|><|maclane|>\n[Prompt: What are you afraid of right now?]\n7 June 2026.\n"),
+    ("Fear / Blended",    "<|entry|>\n7 June 2026.\nWhat am I afraid of right now?\n\n"),
+    ("Fear / Pepys",      "<|entry|><|pepys|>\n7 June 2026.\nWhat am I afraid of right now?\n\n"),
+    ("Fear / Van Gogh",   "<|entry|><|vangogh|>\n7 June 2026.\nWhat am I afraid of right now?\n\n"),
+    ("Fear / Mansfield",  "<|entry|><|mansfield|>\n7 June 2026.\nWhat am I afraid of right now?\n\n"),
+    ("Fear / MacLane",    "<|entry|><|maclane|>\n7 June 2026.\nWhat am I afraid of right now?\n\n"),
 
     # --- CHUNK 2: Observation / Sensory ---
-    ("Obs / Blended",     "<|entry|>\n[Prompt: What did you notice today that no one else did?]\n7 June 2026.\n"),
-    ("Obs / Pepys",       "<|entry|><|pepys|>\n[Prompt: What did you notice today that no one else did?]\n7 June 2026.\n"),
-    ("Obs / Van Gogh",    "<|entry|><|vangogh|>\n[Prompt: What did you notice today that no one else did?]\n7 June 2026.\n"),
-    ("Obs / Mansfield",   "<|entry|><|mansfield|>\n[Prompt: What did you notice today that no one else did?]\n7 June 2026.\n"),
-    ("Obs / MacLane",     "<|entry|><|maclane|>\n[Prompt: What did you notice today that no one else did?]\n7 June 2026.\n"),
+    ("Obs / Blended",     "<|entry|>\n7 June 2026.\nWhat did I notice today that no one else did?\n\n"),
+    ("Obs / Pepys",       "<|entry|><|pepys|>\n7 June 2026.\nWhat did I notice today that no one else did?\n\n"),
+    ("Obs / Van Gogh",    "<|entry|><|vangogh|>\n7 June 2026.\nWhat did I notice today that no one else did?\n\n"),
+    ("Obs / Mansfield",   "<|entry|><|mansfield|>\n7 June 2026.\nWhat did I notice today that no one else did?\n\n"),
+    ("Obs / MacLane",     "<|entry|><|maclane|>\n7 June 2026.\nWhat did I notice today that no one else did?\n\n"),
 ]
 
 
@@ -257,7 +257,7 @@ def main():
         logging_steps=cfg["logging_steps"],
         eval_strategy="steps",
         eval_steps=cfg["eval_steps"],
-        save_strategy="epoch",
+        save_strategy="no",
         save_total_limit=cfg["save_total_limit"],
         report_to=[],
     )

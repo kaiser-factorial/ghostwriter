@@ -49,28 +49,27 @@ PERSONA_TOKENS = {p: f"<|{p}|>" for p in PERSONAS}
 SPECIAL_TOKENS = [ENTRY_OPEN, ENTRY_CLOSE, *PERSONA_TOKENS.values()]
 
 # Generic introspection prompts: deliberately answerable by *any* diary entry,
-# so prompt-conditioning stays truthful. (Specific prompts paired with random
-# entries would teach the model to ignore the prompt.)
+# formatted as first-person rhetorical questions written by the diarist themselves.
 GENERIC_PROMPTS = [
-    "What is on your mind today?",
-    "Write about your day.",
-    "What happened today?",
-    "How are you feeling, honestly?",
-    "What do you keep returning to?",
-    "Set down the truth of this day.",
-    "What did you notice today that no one else did?",
-    "What are you afraid of right now?",
-    "What do you want?",
-    "Write until something true appears.",
-    "What would you say if no one could ever read this?",
-    "Describe where you are.",
-    "What is the weather inside you?",
-    "What are you working on, and how does it go?",
-    "Who occupied your thoughts today?",
+    "What is on my mind today?",
+    "I must write about my day.",
+    "What exactly happened today?",
+    "How am I feeling, honestly?",
+    "What do I keep returning to?",
+    "I need to set down the truth of this day.",
+    "What did I notice today that no one else did?",
+    "What am I afraid of right now?",
+    "What do I actually want?",
+    "I will write until something true appears.",
+    "What would I say if no one could ever read this?",
+    "Describe where I am.",
+    "What is the weather inside me?",
+    "What am I working on, and how does it go?",
+    "Who occupied my thoughts today?",
     "What small thing mattered today?",
-    "Confess something.",
-    "What do you keep refusing to look at?",
-    "Make an account of yourself.",
+    "I must confess something.",
+    "What do I keep refusing to look at?",
+    "I must make an account of myself.",
     "What does this day deserve to have remembered of it?",
 ]
 
@@ -87,9 +86,9 @@ def format_doc(entry: dict, use_persona: bool, prompt: str | None) -> str:
     if use_persona:
         parts.append(PERSONA_TOKENS[entry["persona"]])
     parts.append("\n")
-    if prompt:
-        parts.append(f"[Prompt: {prompt}]\n")
     parts.append(f"{normalize_date(entry['date'])}.\n")
+    if prompt:
+        parts.append(f"{prompt}\n\n")
     if entry.get("title"):
         parts.append(f"{entry['title']}\n")
     parts.append(entry["text"].strip())

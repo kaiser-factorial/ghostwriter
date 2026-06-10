@@ -6,7 +6,7 @@ seed: 42
 max_seq_len: 2048
 
 learning_rate: 2.0e-5
-num_train_epochs: 2
+num_train_epochs: 3
 per_device_train_batch_size: 1
 gradient_accumulation_steps: 16
 warmup_ratio: 0.03
@@ -20,6 +20,6 @@ eval_steps: 50
 
 run_test_inference: true
 test_max_new_tokens: 250
-test_temperature: 0.9
+test_temperature: 0.92
 test_top_p: 0.95
 test_repetition_penalty: 1.05
