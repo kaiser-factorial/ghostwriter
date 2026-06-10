@@ -43,7 +43,7 @@ DEFAULTS = dict(
     max_seq_len=2048,
     # optimization
     learning_rate=2e-5,
-    num_train_epochs=3,
+    num_train_epochs=5,
     per_device_train_batch_size=4,
     gradient_accumulation_steps=4,
     warmup_ratio=0.03,
