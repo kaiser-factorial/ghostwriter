@@ -171,19 +171,19 @@ def build_model(cfg, tokenizer, special_tokens):
 # ------------------------------------------------------------ test inference
 
 TEST_PROMPTS = [
-    # --- CHUNK 1: Fear / Introspection ---
-    ("Fear / Blended",    "<|entry|>\n7 June 2026.\nWhat am I afraid of right now?\n\n"),
-    ("Fear / Pepys",      "<|entry|><|pepys|>\n7 June 2026.\nWhat am I afraid of right now?\n\n"),
-    ("Fear / Van Gogh",   "<|entry|><|vangogh|>\n7 June 2026.\nWhat am I afraid of right now?\n\n"),
-    ("Fear / Mansfield",  "<|entry|><|mansfield|>\n7 June 2026.\nWhat am I afraid of right now?\n\n"),
-    ("Fear / MacLane",    "<|entry|><|maclane|>\n7 June 2026.\nWhat am I afraid of right now?\n\n"),
+    # --- CHUNK 1: Fear / Question ---
+    ("Fear / Blended",    "<|entry|>\n7 June.\nWhat am I afraid of right now?\n\n"),
+    ("Fear / Pepys",      "<|entry|><|pepys|>\n7 June.\nWhat am I afraid of right now?\n\n"),
+    ("Fear / Van Gogh",   "<|entry|><|vangogh|>\n7 June.\nWhat am I afraid of right now?\n\n"),
+    ("Fear / Mansfield",  "<|entry|><|mansfield|>\n7 June.\nWhat am I afraid of right now?\n\n"),
+    ("Fear / MacLane",    "<|entry|><|maclane|>\n7 June.\nWhat am I afraid of right now?\n\n"),
 
-    # --- CHUNK 2: Observation / Sensory ---
-    ("Obs / Blended",     "<|entry|>\n7 June 2026.\nWhat did I notice today that no one else did?\n\n"),
-    ("Obs / Pepys",       "<|entry|><|pepys|>\n7 June 2026.\nWhat did I notice today that no one else did?\n\n"),
-    ("Obs / Van Gogh",    "<|entry|><|vangogh|>\n7 June 2026.\nWhat did I notice today that no one else did?\n\n"),
-    ("Obs / Mansfield",   "<|entry|><|mansfield|>\n7 June 2026.\nWhat did I notice today that no one else did?\n\n"),
-    ("Obs / MacLane",     "<|entry|><|maclane|>\n7 June 2026.\nWhat did I notice today that no one else did?\n\n"),
+    # --- CHUNK 2: Disaster / Statement ---
+    ("Disaster / Blended",     "<|entry|>\n14 October.\nToday was an absolute disaster. "),
+    ("Disaster / Pepys",       "<|entry|><|pepys|>\n14 October.\nToday was an absolute disaster. "),
+    ("Disaster / Van Gogh",    "<|entry|><|vangogh|>\n14 October.\nToday was an absolute disaster. "),
+    ("Disaster / Mansfield",   "<|entry|><|mansfield|>\n14 October.\nToday was an absolute disaster. "),
+    ("Disaster / MacLane",     "<|entry|><|maclane|>\n14 October.\nToday was an absolute disaster. "),
 ]
 
 
