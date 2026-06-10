@@ -1,0 +1,25 @@
+# Ghost Diary — Qwen2.5-3B full fine-tune (single A100/H100/4090-24GB w/ grad ckpt)
+model_name: Qwen/Qwen2.5-3B
+dataset_dir: data/dataset
+output_dir: outputs/ghost-qwen3b
+seed: 42
+max_seq_len: 1024
+
+learning_rate: 2.0e-5
+num_train_epochs: 2
+per_device_train_batch_size: 4
+gradient_accumulation_steps: 4
+warmup_ratio: 0.03
+weight_decay: 0.01
+lr_scheduler_type: cosine
+bf16: true
+gradient_checkpointing: true
+
+logging_steps: 10
+eval_steps: 50
+
+run_test_inference: true
+test_max_new_tokens: 250
+test_temperature: 0.9
+test_top_p: 0.95
+test_repetition_penalty: 1.05

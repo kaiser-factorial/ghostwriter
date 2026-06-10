@@ -1,0 +1,14 @@
+# LoRA fallback if VRAM is tight (~12GB). Embeddings/lm_head still trained
+# (modules_to_save) so the ghost tokens learn.
+model_name: Qwen/Qwen2.5-3B
+dataset_dir: data/dataset
+output_dir: outputs/ghost-qwen3b-lora
+lora: true
+lora_r: 32
+lora_alpha: 64
+learning_rate: 1.0e-4
+num_train_epochs: 3
+per_device_train_batch_size: 4
+gradient_accumulation_steps: 4
+bf16: true
+gradient_checkpointing: true

@@ -1,0 +1,14 @@
+# CPU smoke test — tiny model, few steps; exercises the full code path.
+model_name: HuggingFaceTB/SmolLM2-135M
+dataset_dir: data/dataset
+output_dir: outputs/smoke
+max_seq_len: 256
+learning_rate: 5.0e-4
+num_train_epochs: 0.02
+per_device_train_batch_size: 2
+gradient_accumulation_steps: 1
+bf16: false
+gradient_checkpointing: false
+logging_steps: 2
+eval_steps: 10
+test_max_new_tokens: 60
