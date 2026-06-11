@@ -96,6 +96,10 @@ def reformulate_query(chat_history: list[dict], user_msg: str) -> str:
     print(f"Reformulated query: {res_text}")
     return res_text
 
+@app.get("/")
+def read_root():
+    return {"status": "Ghost Diary API is running!"}
+
 @app.post("/api/chat")
 def chat_endpoint(req: ChatRequest):
     try:
