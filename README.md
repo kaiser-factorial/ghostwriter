@@ -1,3 +1,13 @@
+---
+title: Ghostwriter API
+emoji: 👻
+colorFrom: purple
+colorTo: gray
+sdk: docker
+app_file: api.py
+pinned: false
+---
+
 # Ghostwriter 👻📓
 
 Fine-tune one small model on four dead diarists. Give it a date; a ghost
