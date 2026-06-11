@@ -36,13 +36,13 @@ BANNER = "=" * 78
 # ------------------------------------------------------------ config
 
 DEFAULTS = dict(
-    model_name="Qwen/Qwen2.5-3B-Instruct",
+    model_name="Qwen/Qwen2.5-3B",
     dataset_dir="data/dataset",
-    output_dir="outputs/ghost-qwen3b",
+    output_dir="outputs/ghost-qwen3b-base",
     seed=42,
     max_seq_len=2048,
     # optimization
-    learning_rate=1e-5,
+    learning_rate=2e-5,
     embed_lr_multiplier=10.0,
     num_train_epochs=5,
     per_device_train_batch_size=4,

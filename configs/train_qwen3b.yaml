@@ -1,5 +1,5 @@
-# Ghost Diary — Qwen2.5-3B-Instruct full fine-tune (single A100/H100/4090-24GB w/ grad ckpt)
-model_name: Qwen/Qwen2.5-3B-Instruct
+# Ghost Diary — Qwen2.5-3B full fine-tune (single A100/H100/4090-24GB w/ grad ckpt)
+model_name: Qwen/Qwen2.5-3B
 dataset_dir: data/dataset
 output_dir: outputs/ghost-qwen3b
 seed: 42

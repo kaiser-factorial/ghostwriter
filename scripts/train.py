@@ -36,7 +36,7 @@ BANNER = "=" * 78
 # ------------------------------------------------------------ config
 
 DEFAULTS = dict(
-    model_name="Qwen/Qwen2.5-3B-Instruct",
+    model_name="Qwen/Qwen2.5-3B",
     dataset_dir="data/dataset",
     output_dir="outputs/ghost-qwen3b",
     seed=42,
