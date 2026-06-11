@@ -25,7 +25,8 @@ MODEL_DIR = "Qwen/Qwen2.5-3B-Instruct"
 
 print(f"Loading {MODEL_DIR} into VRAM...")
 tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
-model = AutoModelForCausalLM.from_pretrained(MODEL_DIR, torch_dtype=torch.float16).to("mps")
+device = "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
+model = AutoModelForCausalLM.from_pretrained(MODEL_DIR, torch_dtype=torch.float16).to(device)
 print("Model loaded.")
 
 PERSONA_SYSTEM_PROMPTS = {
