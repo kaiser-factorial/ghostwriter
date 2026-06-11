@@ -50,12 +50,12 @@ def main():
     # Get RAG memories
     memories = get_relevant_memories(args.prompt, args.persona, args.num_memories)
     
-    # Format the prompt exactly how RAFT was trained
+    # Format the prompt for conversational RAG
     ctx_str = "\n\n".join([f"--- MEMORY ---\n{c}" for c in memories])
-    user_prompt = f"You are a specific historical figure. You have the following memories to draw upon:\n\n{ctx_str}\n\nBased on your memories and persona, answer the following prompt:\n{args.prompt}"
+    user_prompt = f"Here are your personal memories and background knowledge:\n\n{ctx_str}\n\nUser Message: {args.prompt}"
     
     chat_text = (
-        f"<|im_start|>system\nYou are {args.persona.capitalize()}. You must emulate their exact speaking and writing style.<|im_end|>\n"
+        f"<|im_start|>system\nYou are {args.persona.capitalize()}. You are having a live conversation. Answer the user's questions naturally in the first person using your exact historical writing style. Draw upon your memories for context, but DO NOT copy them word-for-word. Speak directly to the user.<|im_end|>\n"
         f"<|im_start|>user\n{user_prompt}<|im_end|>\n"
         f"<|im_start|>assistant\n"
     )
