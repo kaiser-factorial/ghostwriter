@@ -101,6 +101,13 @@ def load_config() -> dict:
     args = ap.parse_args()
 
     cfg = dict(DEFAULTS)
+    
+    # Auto-detect OPBDH environment variables
+    if "OPBDH_MODEL_ID" in os.environ:
+        cfg["model_name"] = os.environ["OPBDH_MODEL_ID"]
+    if "OPBDH_RESULTS_DIR" in os.environ:
+        cfg["output_dir"] = os.path.join(os.environ["OPBDH_RESULTS_DIR"], "ghost-qwen3b")
+
     if args.config:
         cfg.update(yaml.safe_load(Path(args.config).read_text()) or {})
     for kv in args.override:
