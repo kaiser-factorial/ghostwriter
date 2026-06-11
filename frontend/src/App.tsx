@@ -26,6 +26,10 @@ export default function App() {
   const [activeVector, setActiveVector] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
+  const [chatHistory, setChatHistory] = useState<{role: string, content: string}[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [isTyping, setIsTyping] = useState(false);
+
   const entries = useMemo(() => {
     let filtered = activeFilter ? rawEntries.filter((e: any) => e.persona === activeFilter) : [...rawEntries];
     if (sortOrder === 'desc') {
@@ -324,19 +328,81 @@ export default function App() {
                     I am the resonance of {personaData?.name || 'the spirits'}. Ask me of the thoughts penned on this day, or what shadows danced at the edge of my vision...
                   </p>
                 </div>
+                
+                {chatHistory.map((msg, idx) => (
+                  <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[85%] p-4 rounded-lg border ${
+                      msg.role === 'user' 
+                        ? 'bg-white/10 border-white/10 rounded-tr-none' 
+                        : `bg-white/[0.02] ${activeGlow} border-white/5 rounded-tl-none`
+                    }`}>
+                      <p className={`text-sm leading-relaxed ${msg.role === 'user' ? 'font-sans' : 'font-serif'}`}>
+                        {msg.content}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+                
+                {isTyping && (
+                  <div className="flex justify-start">
+                    <div className={`border p-4 rounded-lg rounded-tl-none bg-white/[0.02] ${activeGlow} border-white/5 flex items-center gap-2`}>
+                      <div className="w-2 h-2 rounded-full bg-white/30 animate-pulse" />
+                      <div className="w-2 h-2 rounded-full bg-white/30 animate-pulse delay-75" />
+                      <div className="w-2 h-2 rounded-full bg-white/30 animate-pulse delay-150" />
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="p-4 border-t border-white/5 bg-background">
-                <div className="relative">
+                <form 
+                  className="relative"
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!chatInput.trim() || isTyping) return;
+                    
+                    const userMsg = chatInput;
+                    setChatInput("");
+                    setChatHistory(prev => [...prev, { role: 'user', content: userMsg }]);
+                    setIsTyping(true);
+                    
+                    try {
+                      // Determine which persona to hit. If activeVector is set, use it.
+                      // Otherwise, use the current entry's persona. 
+                      // If the entry is "Blended Voice" (no persona), fallback to Van Gogh or someone.
+                      const targetPersona = activeVector || currentEntry?.persona || 'van_gogh';
+                      
+                      const res = await fetch("http://localhost:8000/api/chat", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({
+                          persona: targetPersona,
+                          message: userMsg,
+                          history: chatHistory
+                        })
+                      });
+                      
+                      const data = await res.json();
+                      setChatHistory(prev => [...prev, { role: 'assistant', content: data.response }]);
+                    } catch (err) {
+                      console.error("Error communicating with spirits:", err);
+                      setChatHistory(prev => [...prev, { role: 'assistant', content: "The connection to the other side was lost..." }]);
+                    } finally {
+                      setIsTyping(false);
+                    }
+                  }}
+                >
                   <input 
                     type="text" 
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
                     placeholder="Whisper into the void..." 
                     className="w-full bg-white/5 border border-white/10 rounded-full py-3 pl-5 pr-12 text-sm font-sans text-white placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-white/20"
                   />
-                  <Button size="icon" variant="ghost" className="absolute right-1 top-1 h-9 w-9 rounded-full hover:bg-white/10">
+                  <Button type="submit" disabled={isTyping || !chatInput.trim()} size="icon" variant="ghost" className="absolute right-1 top-1 h-9 w-9 rounded-full hover:bg-white/10">
                     <Send className={`w-4 h-4 ${activeColor}`} />
                   </Button>
-                </div>
+                </form>
               </div>
             </motion.aside>
           )}
