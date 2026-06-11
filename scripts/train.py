@@ -42,7 +42,7 @@ DEFAULTS = dict(
     seed=42,
     max_seq_len=2048,
     # optimization
-    learning_rate=2e-5,
+    learning_rate=1e-5,
     num_train_epochs=5,
     per_device_train_batch_size=4,
     gradient_accumulation_steps=4,
@@ -171,14 +171,21 @@ def build_model(cfg, tokenizer, special_tokens):
 # ------------------------------------------------------------ test inference
 
 TEST_PROMPTS = [
-    # --- CHUNK 1: Fear / Question ---
-    ("Fear / Blended",    "<|entry|>\n7 June.\nWhat am I afraid of right now?\n\n"),
-    ("Fear / Pepys",      "<|entry|><|pepys|>\n7 June.\nWhat am I afraid of right now?\n\n"),
-    ("Fear / Van Gogh",   "<|entry|><|vangogh|>\n7 June.\nWhat am I afraid of right now?\n\n"),
-    ("Fear / Mansfield",  "<|entry|><|mansfield|>\n7 June.\nWhat am I afraid of right now?\n\n"),
-    ("Fear / MacLane",    "<|entry|><|maclane|>\n7 June.\nWhat am I afraid of right now?\n\n"),
+    # --- CHUNK 1: Wonderful / Statement ---
+    ("Wonderful / Blended",     "<|entry|>\n7 June.\nToday was a wonderful day. "),
+    ("Wonderful / Pepys",       "<|entry|><|pepys|>\n7 June.\nToday was a wonderful day. "),
+    ("Wonderful / Van Gogh",    "<|entry|><|vangogh|>\n7 June.\nToday was a wonderful day. "),
+    ("Wonderful / Mansfield",   "<|entry|><|mansfield|>\n7 June.\nToday was a wonderful day. "),
+    ("Wonderful / MacLane",     "<|entry|><|maclane|>\n7 June.\nToday was a wonderful day. "),
 
-    # --- CHUNK 2: Disaster / Statement ---
+    # --- CHUNK 2: Interesting / Statement ---
+    ("Interesting / Blended",     "<|entry|>\n14 October.\nToday was quite interesting. "),
+    ("Interesting / Pepys",       "<|entry|><|pepys|>\n14 October.\nToday was quite interesting. "),
+    ("Interesting / Van Gogh",    "<|entry|><|vangogh|>\n14 October.\nToday was quite interesting. "),
+    ("Interesting / Mansfield",   "<|entry|><|mansfield|>\n14 October.\nToday was quite interesting. "),
+    ("Interesting / MacLane",     "<|entry|><|maclane|>\n14 October.\nToday was quite interesting. "),
+
+    # --- CHUNK 3: Disaster / Statement ---
     ("Disaster / Blended",     "<|entry|>\n14 October.\nToday was an absolute disaster. "),
     ("Disaster / Pepys",       "<|entry|><|pepys|>\n14 October.\nToday was an absolute disaster. "),
     ("Disaster / Van Gogh",    "<|entry|><|vangogh|>\n14 October.\nToday was an absolute disaster. "),
