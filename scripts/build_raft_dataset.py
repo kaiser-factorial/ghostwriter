@@ -65,14 +65,14 @@ def main():
             
             user_prompt = format_raft_prompt(question, memories)
             
-            # ChatML format
-            chat = [
-                {"role": "system", "content": f"You are {p.capitalize()}. You must emulate their exact speaking and writing style."},
-                {"role": "user", "content": user_prompt},
-                {"role": "assistant", "content": target_entry}
-            ]
+            # ChatML format string for Qwen
+            chat_text = (
+                f"<|im_start|>system\nYou are {p.capitalize()}. You must emulate their exact speaking and writing style.<|im_end|>\n"
+                f"<|im_start|>user\n{user_prompt}<|im_end|>\n"
+                f"<|im_start|>assistant\n{target_entry}<|im_end|>\n"
+            )
             
-            raft_data.append({"messages": chat, "persona": p})
+            raft_data.append({"text": chat_text, "persona": p})
 
     # Shuffle and split
     rng.shuffle(raft_data)
@@ -83,6 +83,9 @@ def main():
         with (args.out_dir / f"{name}.jsonl").open("w") as f:
             for d in docs:
                 f.write(json.dumps(d, ensure_ascii=False) + "\n")
+
+    # Write meta.json so train.py doesn't crash when looking for special tokens
+    (args.out_dir / "meta.json").write_text(json.dumps({"special_tokens": []}))
 
     print(f"✅ Generated RAFT dataset: {len(train)} train, {len(val)} val.")
 
