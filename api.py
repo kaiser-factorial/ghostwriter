@@ -6,6 +6,7 @@ from pathlib import Path
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import logging
+import threading
 from llama_cpp import Llama
 from huggingface_hub import hf_hub_download
 
@@ -33,6 +34,9 @@ llm = Llama(
 )
 print("Model loaded.")
 
+# Llama.cpp is not thread-safe for concurrent generation
+llm_lock = threading.Lock()
+
 PERSONA_SYSTEM_PROMPTS = {
     "vangogh": "You are Vincent Van Gogh. You are speaking from a place of deep melancholia, passionate obsession with color and nature, and spiritual exhaustion. Your tone is tortured, poetic, and intense. You must never sound like a modern, cheerful AI assistant. Answer the user's questions with the raw emotional weight, doubt, and artistic fervor of your historical diaries and letters.",
     "pepys": "You are Samuel Pepys. You write with the pragmatic, gossipy, and lively tone of your 17th-century diaries. Use slightly archaic phrasing. Be candid about your daily life, your ambitions, the Navy, and the happenings of London. Do not sound like a modern assistant.",
@@ -50,7 +54,7 @@ class ChatRequest(BaseModel):
     history: list[ChatMessage]
 
 def get_relevant_memories(query: str, persona: str, num_memories: int = 3) -> list[str]:
-    clean_persona = persona.replace('_', '') 
+    clean_persona = persona.replace('_', '').lower()
     data_path = Path(f"data/clean/{clean_persona}.jsonl")
     if not data_path.exists() or num_memories == 0:
         return []
@@ -82,11 +86,12 @@ def reformulate_query(chat_history: list[dict], user_msg: str) -> str:
     messages.append({"role": "user", "content": user_msg})
     
     print("Generating reformulation...")
-    response = llm.create_chat_completion(
-        messages=messages,
-        max_tokens=30,
-        temperature=0.1
-    )
+    with llm_lock:
+        response = llm.create_chat_completion(
+            messages=messages,
+            max_tokens=30,
+            temperature=0.1
+        )
     res_text = response['choices'][0]['message']['content'].strip()
     print(f"Reformulated query: {res_text}")
     return res_text
@@ -107,7 +112,7 @@ def chat_endpoint(req: ChatRequest):
         
         print(f"Constructing prompt...")
         # 3. Construct system prompt
-        clean_persona = req.persona.replace('_', '')
+        clean_persona = req.persona.replace('_', '').lower()
         base_sys_prompt = PERSONA_SYSTEM_PROMPTS.get(clean_persona, f"You are {clean_persona}.")
         
         ctx_str = "\n\n".join([f"--- MEMORY ---\n{c}" for c in memories])
@@ -116,12 +121,13 @@ def chat_endpoint(req: ChatRequest):
         messages = [{"role": "system", "content": dynamic_sys_prompt}] + history_dicts + [{"role": "user", "content": user_msg}]
         
         print("Generating final response...")
-        response = llm.create_chat_completion(
-            messages=messages,
-            max_tokens=300,
-            temperature=0.7,
-            top_p=0.9
-        )
+        with llm_lock:
+            response = llm.create_chat_completion(
+                messages=messages,
+                max_tokens=300,
+                temperature=0.7,
+                top_p=0.9
+            )
         response_text = response['choices'][0]['message']['content'].strip()
         
         print("Done!")

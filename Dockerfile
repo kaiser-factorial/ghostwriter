@@ -1,5 +1,8 @@
 FROM python:3.11-slim
 
+# Install build tools for llama-cpp-python just in case there are no prebuilt wheels
+RUN apt-get update && apt-get install -y build-essential cmake
+
 # Create a non-root user that HuggingFace Spaces requires
 RUN useradd -m -u 1000 user
 USER user
