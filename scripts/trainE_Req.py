@@ -89,6 +89,7 @@ DEFAULTS = dict(
     test_temperature=0.92,
     test_top_p=0.95,
     test_repetition_penalty=1.05,
+    save=False,
 )
 
 
@@ -98,6 +99,7 @@ def load_config() -> dict:
     ap.add_argument("--override", nargs="*", default=[],
                     help="key=value pairs overriding config")
     ap.add_argument("--lora", action="store_true", help="shortcut for lora=true")
+    ap.add_argument("--save", action="store_true", help="Save the model weights at the end")
     args = ap.parse_args()
 
     cfg = dict(DEFAULTS)
@@ -107,6 +109,9 @@ def load_config() -> dict:
         cfg["model_name"] = os.environ["OPBDH_MODEL_ID"]
     if "OPBDH_RESULTS_DIR" in os.environ:
         cfg["output_dir"] = os.path.join(os.environ["OPBDH_RESULTS_DIR"], "ghost-qwen3b")
+
+    if args.save:
+        cfg["save"] = True
 
     if args.config:
         cfg.update(yaml.safe_load(Path(args.config).read_text()) or {})
@@ -336,14 +341,17 @@ def main():
     print(f"[train] final eval_loss={metrics.get('eval_loss'):.4f}  ppl={ppl:.2f}")
 
     # ---- save
-    out = Path(cfg["output_dir"]) / "final"
-    trainer.save_model(str(out))
-    tokenizer.save_pretrained(str(out))
-    run_record = {**cfg, "final_eval_loss": metrics.get("eval_loss"),
-                  "final_ppl": ppl, "train_blocks": len(train_ds),
-                  "wallclock_sec": round(time.time() - t0, 1)}
-    (out / "run_config.json").write_text(json.dumps(run_record, indent=2))
-    shout("SAVED — final model + tokenizer + run_config.json", {"path": str(out)})
+    if cfg["save"]:
+        out = Path(cfg["output_dir"]) / "final"
+        trainer.save_model(str(out))
+        tokenizer.save_pretrained(str(out))
+        run_record = {**cfg, "final_eval_loss": metrics.get("eval_loss"),
+                      "final_ppl": ppl, "train_blocks": len(train_ds),
+                      "wallclock_sec": round(time.time() - t0, 1)}
+        (out / "run_config.json").write_text(json.dumps(run_record, indent=2))
+        shout("SAVED — final model + tokenizer + run_config.json", {"path": str(out)})
+    else:
+        print("\n[save] Skipping model save (--save flag not provided).")
 
     # ---- prove the ghost speaks
     if cfg["run_test_inference"]:
