@@ -5,3 +5,8 @@ accelerate>=0.33
 peft>=0.12
 pyyaml
 google-genai
+llama-cpp-python
+huggingface_hub
+fastapi
+uvicorn
+scikit-learn

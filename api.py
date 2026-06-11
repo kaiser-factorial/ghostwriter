@@ -2,12 +2,12 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import json
-import torch
 from pathlib import Path
-from transformers import AutoModelForCausalLM, AutoTokenizer
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 import logging
+from llama_cpp import Llama
+from huggingface_hub import hf_hub_download
 
 logging.basicConfig(level=logging.INFO)
 
@@ -21,12 +21,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-MODEL_DIR = "Qwen/Qwen2.5-3B-Instruct"
+print("Downloading/Locating Qwen2.5-3B-Instruct GGUF model...")
+model_path = hf_hub_download(repo_id="Qwen/Qwen2.5-3B-Instruct-GGUF", filename="qwen2.5-3b-instruct-q4_k_m.gguf")
 
-print(f"Loading {MODEL_DIR} into VRAM...")
-tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
-device = "mps" if torch.backends.mps.is_available() else "cuda" if torch.cuda.is_available() else "cpu"
-model = AutoModelForCausalLM.from_pretrained(MODEL_DIR, torch_dtype=torch.float16).to(device)
+print(f"Loading model into memory...")
+llm = Llama(
+    model_path=model_path,
+    n_ctx=4096,
+    n_gpu_layers=-1, # Automatically offload layers to GPU if available (CUDA or Metal)
+    verbose=False
+)
 print("Model loaded.")
 
 PERSONA_SYSTEM_PROMPTS = {
@@ -46,8 +50,6 @@ class ChatRequest(BaseModel):
     history: list[ChatMessage]
 
 def get_relevant_memories(query: str, persona: str, num_memories: int = 3) -> list[str]:
-    # Need to map activeVector/persona string to the clean files.
-    # UI sends 'van_gogh' but our file is 'vangogh'
     clean_persona = persona.replace('_', '') 
     data_path = Path(f"data/clean/{clean_persona}.jsonl")
     if not data_path.exists() or num_memories == 0:
@@ -72,23 +74,22 @@ def reformulate_query(chat_history: list[dict], user_msg: str) -> str:
     if not chat_history:
         return user_msg
         
-    prompt = f"<|im_start|>system\nYou are a query reformulator. Given the chat history and the user's latest message, rewrite the user's message to be a standalone search query that captures the full context. Only return the rewritten query text.<|im_end|>\n"
+    messages = [
+        {"role": "system", "content": "You are a query reformulator. Given the chat history and the user's latest message, rewrite the user's message to be a standalone search query that captures the full context. Only return the rewritten query text."}
+    ]
     for msg in chat_history[-3:]:
-        prompt += f"<|im_start|>{msg['role']}\n{msg['content']}<|im_end|>\n"
-    prompt += f"<|im_start|>user\n{user_msg}<|im_end|>\n<|im_start|>assistant\n"
+        messages.append({"role": msg["role"], "content": msg["content"]})
+    messages.append({"role": "user", "content": user_msg})
     
-    print("Tokenizing prompt...")
-    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
     print("Generating reformulation...")
-    with torch.no_grad():
-        outputs = model.generate(**inputs, max_new_tokens=30, temperature=0.1, pad_token_id=tokenizer.eos_token_id)
-    
-    print("Decoding reformulation...")
-    full_output = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    # The output will include the prompt. We just want the assistant's part.
-    response = full_output.split("<|im_start|>assistant\n")[-1].strip()
-    print(f"Reformulated query: {response}")
-    return response
+    response = llm.create_chat_completion(
+        messages=messages,
+        max_tokens=30,
+        temperature=0.1
+    )
+    res_text = response['choices'][0]['message']['content'].strip()
+    print(f"Reformulated query: {res_text}")
+    return res_text
 
 @app.post("/api/chat")
 def chat_endpoint(req: ChatRequest):
@@ -109,30 +110,19 @@ def chat_endpoint(req: ChatRequest):
         clean_persona = req.persona.replace('_', '')
         base_sys_prompt = PERSONA_SYSTEM_PROMPTS.get(clean_persona, f"You are {clean_persona}.")
         
-        # Context
         ctx_str = "\n\n".join([f"--- MEMORY ---\n{c}" for c in memories])
         dynamic_sys_prompt = f"{base_sys_prompt}\n\nYou have the following personal memories to draw upon. Integrate this knowledge naturally into the conversation:\n\n{ctx_str}"
         
         messages = [{"role": "system", "content": dynamic_sys_prompt}] + history_dicts + [{"role": "user", "content": user_msg}]
         
-        text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-        print("Tokenizing final prompt...")
-        inputs = tokenizer(text, return_tensors="pt").to(model.device)
-        
         print("Generating final response...")
-        with torch.no_grad():
-            outputs = model.generate(
-                **inputs, 
-                max_new_tokens=300, 
-                temperature=0.7, 
-                top_p=0.9,
-                pad_token_id=tokenizer.eos_token_id
-            )
-            
-        print("Decoding final response...")
-        full_output = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        # Extract only the newly generated text
-        response_text = full_output.split("<|im_start|>assistant\n")[-1].strip()
+        response = llm.create_chat_completion(
+            messages=messages,
+            max_tokens=300,
+            temperature=0.7,
+            top_p=0.9
+        )
+        response_text = response['choices'][0]['message']['content'].strip()
         
         print("Done!")
         return {"response": response_text}
