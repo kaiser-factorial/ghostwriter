@@ -23,6 +23,7 @@ export default function App() {
   
   const [currentIndex, setCurrentIndex] = useState(100); 
   const [activeFilter, setActiveFilter] = useState<string | null>(null);
+  const [activeVector, setActiveVector] = useState<string | null>(null);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   const entries = useMemo(() => {
@@ -34,7 +35,7 @@ export default function App() {
   }, [activeFilter, sortOrder]);
 
   const currentEntry = entries[currentIndex] || entries[0];
-  const personaData = PERSONAS[currentEntry?.persona];
+  const personaData = activeVector ? PERSONAS[activeVector] : PERSONAS[currentEntry?.persona];
   const activeColor = personaData?.color || 'text-purple-400/80';
   const activeGlow = personaData?.glow || 'shadow-purple-400/10';
 
@@ -181,39 +182,65 @@ export default function App() {
                           {personaData?.name || 'Blended Voice'}
                         </span>
                       </div>
-                      
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-white/5">
-                            <Sparkles className={`w-4 h-4 ${activeColor}`} />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-64 p-4 bg-card/95 backdrop-blur border-white/10" sideOffset={12}>
-                          <h4 className="font-serif text-lg mb-4 text-white/90">Resonance Vector</h4>
-                          <div className="space-y-3 text-sm font-sans text-muted-foreground">
-                            {Object.entries(PERSONAS).map(([key, data]) => {
-                              const isActive = key === currentEntry?.persona;
-                              const pct = isActive ? 85 : 5;
-                              return (
-                                <div key={key}>
-                                  <div className="flex justify-between items-center mb-1">
-                                    <span className={isActive ? "text-white" : ""}>{data.name}</span>
-                                    <span className={isActive ? data.color : ""}>{pct}%</span>
+                      <div className="flex items-center gap-4">
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-white/5">
+                              <Sparkles className={`w-4 h-4 ${activeColor}`} />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-64 p-4 bg-card/95 backdrop-blur border-white/10" sideOffset={12}>
+                            <h4 className="font-serif text-lg mb-4 text-white/90">Resonance Vector</h4>
+                            <div className="space-y-3 text-sm font-sans text-muted-foreground">
+                              {Object.entries(PERSONAS).map(([key, data]) => {
+                                const isActive = key === (activeVector || currentEntry?.persona);
+                                const pct = isActive ? 85 : 5;
+                                return (
+                                  <div key={key}>
+                                    <div className="flex justify-between items-center mb-1">
+                                      <span className={isActive ? "text-white" : ""}>{data.name}</span>
+                                      <span className={isActive ? data.color : ""}>{pct}%</span>
+                                    </div>
+                                    <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
+                                      <motion.div 
+                                        initial={{ width: 0 }}
+                                        animate={{ width: `${pct}%` }}
+                                        className={`h-full ${isActive ? data.color.replace('text-', 'bg-').replace('/80', '') : 'bg-white/10'}`} 
+                                      />
+                                    </div>
                                   </div>
-                                  <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
-                                    <motion.div 
-                                      initial={{ width: 0 }}
-                                      animate={{ width: `${pct}%` }}
-                                      className={`h-full ${isActive ? data.color.replace('text-', 'bg-').replace('/80', '') : 'bg-white/10'}`} 
-                                    />
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </PopoverContent>
-                      </Popover>
+                                );
+                              })}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      </div>
                     </header>
+
+                    {/* Vector Lens Control */}
+                    <div className="flex items-center justify-between mb-8 pb-6 border-b border-white/5">
+                      <span className="text-xs uppercase tracking-widest text-white/40 font-sans flex items-center gap-2">
+                        <Filter className="w-3 h-3" />
+                        Apply Vector Lens
+                      </span>
+                      <div className="flex bg-white/5 rounded-full p-1 border border-white/10">
+                        <button 
+                          onClick={() => setActiveVector(null)} 
+                          className={`px-4 py-1.5 rounded-full text-xs font-sans tracking-widest uppercase transition-colors ${activeVector === null ? 'bg-white/20 text-white' : 'text-white/40 hover:text-white/80'}`}
+                        >
+                          Blended
+                        </button>
+                        {Object.entries(PERSONAS).map(([key, data]) => (
+                          <button 
+                            key={key} 
+                            onClick={() => setActiveVector(key)} 
+                            className={`px-4 py-1.5 rounded-full text-xs font-sans tracking-widest uppercase transition-colors ${activeVector === key ? data.color.replace('text-', 'bg-').replace('/80', '/20') + ' ' + data.color : 'text-white/40 hover:text-white/80'}`}
+                          >
+                            {data.name.split(' ').pop()}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
                     <div className="prose prose-invert prose-p:font-serif prose-p:text-xl prose-p:leading-[1.8] prose-p:text-foreground/90 whitespace-pre-wrap">
                       {currentEntry?.text}
