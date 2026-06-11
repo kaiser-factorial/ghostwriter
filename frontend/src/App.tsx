@@ -39,9 +39,13 @@ export default function App() {
   }, [activeFilter, sortOrder]);
 
   const currentEntry = entries[currentIndex] || entries[0];
-  const personaData = activeVector ? PERSONAS[activeVector] : PERSONAS[currentEntry?.persona];
+  const personaData = PERSONAS[currentEntry?.persona] || PERSONAS['maclane'];
   const activeColor = personaData?.color || 'text-purple-400/80';
   const activeGlow = personaData?.glow || 'shadow-purple-400/10';
+
+  const chatPersona = activeVector ? PERSONAS[activeVector] : personaData;
+  const chatColor = chatPersona?.color || activeColor;
+  const chatGlow = chatPersona?.glow || activeGlow;
 
   const handleNext = () => setCurrentIndex(i => Math.min(i + 1, entries.length - 1));
   const handlePrev = () => setCurrentIndex(i => Math.max(i - 1, 0));
@@ -221,30 +225,7 @@ export default function App() {
                       </div>
                     </header>
 
-                    {/* Vector Lens Control */}
-                    <div className="flex items-center justify-between mb-8 pb-6 border-b border-white/5">
-                      <span className="text-xs uppercase tracking-widest text-white/40 font-sans flex items-center gap-2">
-                        <Filter className="w-3 h-3" />
-                        Apply Vector Lens
-                      </span>
-                      <div className="flex bg-white/5 rounded-full p-1 border border-white/10">
-                        <button 
-                          onClick={() => setActiveVector(null)} 
-                          className={`px-4 py-1.5 rounded-full text-xs font-sans tracking-widest uppercase transition-colors ${activeVector === null ? 'bg-white/20 text-white' : 'text-white/40 hover:text-white/80'}`}
-                        >
-                          Blended
-                        </button>
-                        {Object.entries(PERSONAS).map(([key, data]) => (
-                          <button 
-                            key={key} 
-                            onClick={() => setActiveVector(key)} 
-                            className={`px-4 py-1.5 rounded-full text-xs font-sans tracking-widest uppercase transition-colors ${activeVector === key ? data.color.replace('text-', 'bg-').replace('/80', '/20') + ' ' + data.color : 'text-white/40 hover:text-white/80'}`}
-                          >
-                            {data.name.split(' ').pop()}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+
 
                     <div className="prose prose-invert prose-p:font-serif prose-p:text-xl prose-p:leading-[1.8] prose-p:text-foreground/90 whitespace-pre-wrap">
                       {currentEntry?.text}
@@ -315,17 +296,35 @@ export default function App() {
                 <div className="w-1 h-8 bg-white/20 rounded-full" />
               </button>
 
-              <div className="p-6 border-b border-white/5">
+              <div className="p-6 border-b border-white/5 flex flex-col gap-4">
                 <h2 className="font-serif text-2xl tracking-wide font-normal flex items-center gap-3">
-                  <Bot className={`w-5 h-5 ${activeColor}`} />
+                  <Bot className={`w-5 h-5 ${chatColor}`} />
                   The Séance
                 </h2>
+                
+                <div className="flex bg-white/5 rounded-full p-1 border border-white/10 self-start">
+                  <button 
+                    onClick={() => setActiveVector(null)} 
+                    className={`px-3 py-1 rounded-full text-[10px] font-sans tracking-widest uppercase transition-colors ${activeVector === null ? 'bg-white/20 text-white' : 'text-white/40 hover:text-white/80'}`}
+                  >
+                    Auto
+                  </button>
+                  {Object.entries(PERSONAS).map(([key, data]) => (
+                    <button 
+                      key={key} 
+                      onClick={() => setActiveVector(key)} 
+                      className={`px-3 py-1 rounded-full text-[10px] font-sans tracking-widest uppercase transition-colors ${activeVector === key ? data.color.replace('text-', 'bg-').replace('/80', '/20') + ' ' + data.color : 'text-white/40 hover:text-white/80'}`}
+                    >
+                      {data.name.split(' ').pop()}
+                    </button>
+                  ))}
+                </div>
               </div>
               
               <div className="flex-1 p-6 overflow-y-auto space-y-6">
-                <div className={`border p-4 rounded-lg rounded-tl-none bg-white/[0.02] ${activeGlow} border-white/5`}>
+                <div className={`border p-4 rounded-lg rounded-tl-none bg-white/[0.02] ${chatGlow} border-white/5`}>
                   <p className="font-serif text-sm text-foreground/80 leading-relaxed">
-                    I am the resonance of {personaData?.name || 'the spirits'}. Ask me of the thoughts penned on this day, or what shadows danced at the edge of my vision...
+                    I am the resonance of {chatPersona?.name || 'the spirits'}. Ask me of the thoughts penned on this day, or what shadows danced at the edge of my vision...
                   </p>
                 </div>
                 
@@ -334,7 +333,7 @@ export default function App() {
                     <div className={`max-w-[85%] p-4 rounded-lg border ${
                       msg.role === 'user' 
                         ? 'bg-white/10 border-white/10 rounded-tr-none' 
-                        : `bg-white/[0.02] ${activeGlow} border-white/5 rounded-tl-none`
+                        : `bg-white/[0.02] ${chatGlow} border-white/5 rounded-tl-none`
                     }`}>
                       <p className={`text-sm leading-relaxed ${msg.role === 'user' ? 'font-sans' : 'font-serif'}`}>
                         {msg.content}
@@ -345,7 +344,7 @@ export default function App() {
                 
                 {isTyping && (
                   <div className="flex justify-start">
-                    <div className={`border p-4 rounded-lg rounded-tl-none bg-white/[0.02] ${activeGlow} border-white/5 flex items-center gap-2`}>
+                    <div className={`border p-4 rounded-lg rounded-tl-none bg-white/[0.02] ${chatGlow} border-white/5 flex items-center gap-2`}>
                       <div className="w-2 h-2 rounded-full bg-white/30 animate-pulse" />
                       <div className="w-2 h-2 rounded-full bg-white/30 animate-pulse delay-75" />
                       <div className="w-2 h-2 rounded-full bg-white/30 animate-pulse delay-150" />
@@ -400,7 +399,7 @@ export default function App() {
                     className="w-full bg-white/5 border border-white/10 rounded-full py-3 pl-5 pr-12 text-sm font-sans text-white placeholder:text-white/30 focus:outline-none focus:ring-1 focus:ring-white/20"
                   />
                   <Button type="submit" disabled={isTyping || !chatInput.trim()} size="icon" variant="ghost" className="absolute right-1 top-1 h-9 w-9 rounded-full hover:bg-white/10">
-                    <Send className={`w-4 h-4 ${activeColor}`} />
+                    <Send className={`w-4 h-4 ${chatColor}`} />
                   </Button>
                 </form>
               </div>
