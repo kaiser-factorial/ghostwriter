@@ -201,10 +201,12 @@ def test_inference(cfg, model, tokenizer, train_summary: dict):
     model.eval()
     device = next(model.parameters()).device
     eot = tokenizer.convert_tokens_to_ids("<|/entry|>")
+    eos_tokens = [t for t in [eot, tokenizer.eos_token_id] if t is not None]
+    
     for name, prompt in TEST_PROMPTS:
         ids = tokenizer(prompt, return_tensors="pt").to(device)
         with torch.no_grad():
-            out = model.generate(**ids, eos_token_id=[eot, tokenizer.eos_token_id],
+            out = model.generate(**ids, eos_token_id=eos_tokens,
                                  **gen_kwargs)
         text = tokenizer.decode(out[0][ids["input_ids"].shape[1]:],
                                 skip_special_tokens=False)
