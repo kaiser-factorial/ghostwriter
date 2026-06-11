@@ -371,7 +371,7 @@ export default function App() {
                       // If the entry is "Blended Voice" (no persona), fallback to Van Gogh or someone.
                       const targetPersona = activeVector || currentEntry?.persona || 'van_gogh';
                       
-                      const res = await fetch("/api/chat", {
+                      const res = await fetch("https://brick-factorial-ghostwriter-api.hf.space/api/chat", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
