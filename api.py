@@ -74,7 +74,7 @@ def get_relevant_memories(query: str, persona: str, num_memories: int = 3) -> li
     return [entries[i] for i in related_docs_indices]
 
 def reformulate_query(chat_history: list[dict], user_msg: str) -> str:
-    print("Reformulating query...")
+    print("Generating reformulation...", flush=True)
     if not chat_history:
         return user_msg
         
@@ -85,7 +85,6 @@ def reformulate_query(chat_history: list[dict], user_msg: str) -> str:
         messages.append({"role": msg["role"], "content": msg["content"]})
     messages.append({"role": "user", "content": user_msg})
     
-    print("Generating reformulation...")
     with llm_lock:
         response = llm.create_chat_completion(
             messages=messages,
@@ -93,7 +92,7 @@ def reformulate_query(chat_history: list[dict], user_msg: str) -> str:
             temperature=0.1
         )
     res_text = response['choices'][0]['message']['content'].strip()
-    print(f"Reformulated query: {res_text}")
+    print(f"Reformulated query: {res_text}", flush=True)
     return res_text
 
 @app.get("/")
@@ -103,18 +102,19 @@ def read_root():
 @app.post("/api/chat")
 def chat_endpoint(req: ChatRequest):
     try:
-        print(f"Received request for persona: {req.persona}")
+        print(f"\n--- New Request ---", flush=True)
+        print(f"Received request for persona: {req.persona}", flush=True)
         user_msg = req.message
         history_dicts = [{"role": m.role, "content": m.content} for m in req.history]
 
         # 1. Reformulate
         search_query = reformulate_query(history_dicts, user_msg)
         
-        print(f"Fetching memories for query: {search_query}")
+        print(f"Fetching memories for query: {search_query}", flush=True)
         # 2. Get memories
         memories = get_relevant_memories(search_query, req.persona, num_memories=3)
         
-        print(f"Constructing prompt...")
+        print(f"Constructing prompt...", flush=True)
         # 3. Construct system prompt
         clean_persona = req.persona.replace('_', '').lower()
         base_sys_prompt = PERSONA_SYSTEM_PROMPTS.get(clean_persona, f"You are {clean_persona}.")
@@ -124,7 +124,7 @@ def chat_endpoint(req: ChatRequest):
         
         messages = [{"role": "system", "content": dynamic_sys_prompt}] + history_dicts + [{"role": "user", "content": user_msg}]
         
-        print("Generating final response...")
+        print("Generating final response...", flush=True)
         with llm_lock:
             response = llm.create_chat_completion(
                 messages=messages,
@@ -134,7 +134,7 @@ def chat_endpoint(req: ChatRequest):
             )
         response_text = response['choices'][0]['message']['content'].strip()
         
-        print("Done!")
+        print("Done! Sending back to frontend.", flush=True)
         return {"response": response_text}
     except Exception as e:
         logging.error(f"Error in chat endpoint: {e}")
