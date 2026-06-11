@@ -13,7 +13,7 @@ WORKDIR $HOME/app
 
 # Copy requirements and install
 COPY --chown=user requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --no-cache-dir --user -r requirements.txt --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cpu
 RUN pip install --no-cache-dir --user uvicorn
 
 # Copy the application code
