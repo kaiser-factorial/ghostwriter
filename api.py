@@ -25,7 +25,7 @@ MODEL_DIR = "Qwen/Qwen2.5-3B-Instruct"
 
 print(f"Loading {MODEL_DIR} into VRAM...")
 tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
-model = AutoModelForCausalLM.from_pretrained(MODEL_DIR, torch_dtype=torch.float16, device_map="auto")
+model = AutoModelForCausalLM.from_pretrained(MODEL_DIR, torch_dtype=torch.float16).to("mps")
 print("Model loaded.")
 
 PERSONA_SYSTEM_PROMPTS = {
@@ -67,54 +67,74 @@ def get_relevant_memories(query: str, persona: str, num_memories: int = 3) -> li
     return [entries[i] for i in related_docs_indices]
 
 def reformulate_query(chat_history: list[dict], user_msg: str) -> str:
+    print("Reformulating query...")
     if not chat_history:
         return user_msg
         
-    history_str = "\n".join([f"{m['role'].capitalize()}: {m['content']}" for m in chat_history[-4:]])
-    prompt = f"<|im_start|>system\nYou are a helpful search assistant. Read the chat history and the user's latest message. Rewrite the user's latest message into a standalone search query so we can search a historical diary database for relevant context. Return ONLY the search query.<|im_end|>\n<|im_start|>user\nCHAT HISTORY:\n{history_str}\n\nLATEST MESSAGE: {user_msg}\n\nSTANDALONE SEARCH QUERY:<|im_end|>\n<|im_start|>assistant\n"
+    prompt = f"<|im_start|>system\nYou are a query reformulator. Given the chat history and the user's latest message, rewrite the user's message to be a standalone search query that captures the full context. Only return the rewritten query text.<|im_end|>\n"
+    for msg in chat_history[-3:]:
+        prompt += f"<|im_start|>{msg['role']}\n{msg['content']}<|im_end|>\n"
+    prompt += f"<|im_start|>user\n{user_msg}<|im_end|>\n<|im_start|>assistant\n"
     
+    print("Tokenizing prompt...")
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    print("Generating reformulation...")
     with torch.no_grad():
         outputs = model.generate(**inputs, max_new_tokens=30, temperature=0.1, pad_token_id=tokenizer.eos_token_id)
-        
-    generated_ids = outputs[0][inputs["input_ids"].shape[1]:]
-    return tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
+    
+    print("Decoding reformulation...")
+    full_output = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    # The output will include the prompt. We just want the assistant's part.
+    response = full_output.split("<|im_start|>assistant\n")[-1].strip()
+    print(f"Reformulated query: {response}")
+    return response
 
 @app.post("/api/chat")
-async def chat_endpoint(req: ChatRequest):
+def chat_endpoint(req: ChatRequest):
     try:
-        clean_persona = req.persona.replace('_', '')
-        sys_prompt_base = PERSONA_SYSTEM_PROMPTS.get(clean_persona, f"You are {clean_persona}.")
-        
-        # Convert history
+        print(f"Received request for persona: {req.persona}")
+        user_msg = req.message
         history_dicts = [{"role": m.role, "content": m.content} for m in req.history]
+
+        # 1. Reformulate
+        search_query = reformulate_query(history_dicts, user_msg)
         
-        # Reformulate and search
-        search_query = reformulate_query(history_dicts, req.message)
-        memories = get_relevant_memories(search_query, req.persona)
+        print(f"Fetching memories for query: {search_query}")
+        # 2. Get memories
+        memories = get_relevant_memories(search_query, req.persona, num_memories=3)
+        
+        print(f"Constructing prompt...")
+        # 3. Construct system prompt
+        clean_persona = req.persona.replace('_', '')
+        base_sys_prompt = PERSONA_SYSTEM_PROMPTS.get(clean_persona, f"You are {clean_persona}.")
         
         # Context
         ctx_str = "\n\n".join([f"--- MEMORY ---\n{c}" for c in memories])
-        dynamic_sys_prompt = f"{sys_prompt_base}\n\nYou have the following personal memories to draw upon. Integrate this knowledge naturally into the conversation:\n\n{ctx_str}"
+        dynamic_sys_prompt = f"{base_sys_prompt}\n\nYou have the following personal memories to draw upon. Integrate this knowledge naturally into the conversation:\n\n{ctx_str}"
         
-        messages = [{"role": "system", "content": dynamic_sys_prompt}] + history_dicts + [{"role": "user", "content": req.message}]
+        messages = [{"role": "system", "content": dynamic_sys_prompt}] + history_dicts + [{"role": "user", "content": user_msg}]
         
         text = tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+        print("Tokenizing final prompt...")
         inputs = tokenizer(text, return_tensors="pt").to(model.device)
         
+        print("Generating final response...")
         with torch.no_grad():
             outputs = model.generate(
-                **inputs,
-                max_new_tokens=300,
-                temperature=0.85,
-                do_sample=True,
+                **inputs, 
+                max_new_tokens=300, 
+                temperature=0.7, 
+                top_p=0.9,
                 pad_token_id=tokenizer.eos_token_id
             )
             
-        generated_ids = outputs[0][inputs["input_ids"].shape[1]:]
-        response = tokenizer.decode(generated_ids, skip_special_tokens=True).strip()
+        print("Decoding final response...")
+        full_output = tokenizer.decode(outputs[0], skip_special_tokens=True)
+        # Extract only the newly generated text
+        response_text = full_output.split("<|im_start|>assistant\n")[-1].strip()
         
-        return {"response": response}
+        print("Done!")
+        return {"response": response_text}
     except Exception as e:
         logging.error(f"Error in chat endpoint: {e}")
         raise HTTPException(status_code=500, detail=str(e))
