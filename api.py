@@ -150,23 +150,15 @@ def build_messages(req: ChatRequest) -> list[dict]:
     clean_persona = req.persona.replace("_", "").lower()
     base_sys_prompt = PERSONA_SYSTEM_PROMPTS.get(clean_persona, f"You are {clean_persona}.")
     base_sys_prompt += " IMPORTANT: You must keep your responses very short and concise (1-2 short paragraphs maximum) unless absolutely necessary."
-    few_shots = PERSONA_FEW_SHOTS.get(clean_persona, [])
-
-    messages = [{"role": "system", "content": base_sys_prompt}] + few_shots + history_dicts
-
-    # We prepend the retrieved memories (which change every turn) to the final 
-    # user message rather than modifying the first system prompt (which would invalidate
-    # the KV cache). We do not use a separate system message in the middle of the array
-    # because strict chat template parsers (like MLC-LLM) will crash.
-    final_user_content = user_msg
+    
     if memories:
-        # Truncate each memory to ~600 characters to prevent context window overflow
         truncated_memories = [m[:600] + ("..." if len(m) > 600 else "") for m in memories]
         ctx_str = "\n\n".join(f"--- DIARY ENTRY ---\n{c}" for c in truncated_memories)
-        
-        final_user_content = f"Relevant context from your past writings to draw upon implicitly:\n\n{ctx_str}\n\n(Reminder: Stay completely in character. Do not mention that you are an AI, do not refer to these as 'memories', and do not refuse the prompt. Answer directly as your persona.)\n\nUser Question: {user_msg}"
+        base_sys_prompt += f"\n\nRelevant context from your past writings to draw upon implicitly:\n\n{ctx_str}\n\n(Reminder: Stay completely in character. Do not mention that you are an AI, do not refer to these as 'memories', and do not refuse the prompt. Answer directly as your persona.)"
 
-    messages.append({"role": "user", "content": final_user_content})
+    few_shots = PERSONA_FEW_SHOTS.get(clean_persona, [])
+    messages = [{"role": "system", "content": base_sys_prompt}] + few_shots + history_dicts
+    messages.append({"role": "user", "content": user_msg})
 
     return messages
 
