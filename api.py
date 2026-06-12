@@ -151,30 +151,29 @@ def build_messages(req: ChatRequest) -> list[dict]:
     base_sys_prompt = PERSONA_SYSTEM_PROMPTS.get(clean_persona, f"You are {clean_persona}.")
     few_shots = PERSONA_FEW_SHOTS.get(clean_persona, [])
 
+    messages = [{"role": "system", "content": base_sys_prompt}] + few_shots + history_dicts
+
     # KV-cache-friendly ordering: the system prompt, few-shots, and history
     # form a stable, append-only prefix across turns, so llama.cpp can reuse
     # the cached KV for everything except the final message. The retrieved
-    # memories (which change every turn) are injected into the FINAL user
-    # message instead of the system prompt — putting them at position 0 would
-    # invalidate the entire cache on every request.
+    # memories (which change every turn) are injected as a late system message
+    # rather than modifying the first system prompt (which would invalidate
+    # the cache). We also use a separate system message instead of placing it 
+    # inside the user message to prevent the model from breaking character 
+    # and answering like an AI assistant.
     if memories:
         # Truncate each memory to ~1000 characters to prevent context window overflow
         # (Some diary entries in the corpus are 20,000+ characters long)
         truncated_memories = [m[:1000] + ("..." if len(m) > 1000 else "") for m in memories]
-        ctx_str = "\n\n".join(f"--- MEMORY ---\n{c}" for c in truncated_memories)
-        final_user_content = (
-            f"[Private memories of yours that surface as you read this — draw on "
-            f"them naturally, never mention them as 'memories':\n\n{ctx_str}]\n\n{user_msg}"
-        )
-    else:
-        final_user_content = user_msg
+        ctx_str = "\n\n".join(f"--- DIARY ENTRY ---\n{c}" for c in truncated_memories)
+        messages.append({
+            "role": "system",
+            "content": f"Relevant context from your past writings to draw upon implicitly:\n\n{ctx_str}\n\n(Reminder: Stay completely in character. Do not mention that you are an AI, do not refer to these as 'memories', and do not refuse the prompt. Answer directly as your persona.)"
+        })
 
-    return (
-        [{"role": "system", "content": base_sys_prompt}]
-        + few_shots
-        + history_dicts
-        + [{"role": "user", "content": final_user_content}]
-    )
+    messages.append({"role": "user", "content": user_msg})
+
+    return messages
 
 
 GEN_KWARGS = dict(max_tokens=300, temperature=0.7, top_p=0.9)
