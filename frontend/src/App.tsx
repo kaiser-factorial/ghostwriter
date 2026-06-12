@@ -49,12 +49,12 @@ export default function App() {
   }, []);
 
   const entries = useMemo(() => {
-    let filtered = activeFilter ? rawEntries.filter((e: any) => e.persona === activeFilter) : [...rawEntries];
+    const filtered = activeFilter ? rawEntries.filter((e: Entry) => e.persona === activeFilter) : [...rawEntries];
     if (sortOrder === 'desc') {
       filtered.reverse();
     }
     return filtered;
-  }, [activeFilter, sortOrder]);
+  }, [activeFilter, sortOrder, rawEntries]);
 
   const currentEntry = entries[currentIndex] || entries[0];
   const personaData = PERSONAS[currentEntry?.persona] || PERSONAS['maclane'];
@@ -141,7 +141,7 @@ export default function App() {
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 space-y-2 relative no-scrollbar">
-                {entries.slice(Math.max(0, currentIndex - 20), currentIndex + 20).map((entry: any, i: number) => {
+                {entries.slice(Math.max(0, currentIndex - 20), currentIndex + 20).map((entry: Entry, i: number) => {
                   const actualIndex = Math.max(0, currentIndex - 20) + i;
                   const isActive = actualIndex === currentIndex;
                   return (
