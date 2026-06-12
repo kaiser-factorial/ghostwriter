@@ -158,7 +158,14 @@ def build_messages(req: ChatRequest) -> list[dict]:
 
     few_shots = PERSONA_FEW_SHOTS.get(clean_persona, [])
     messages = [{"role": "system", "content": base_sys_prompt}] + few_shots + history_dicts
-    messages.append({"role": "user", "content": user_msg})
+    
+    # Late Persona Reminder: Small models (1.5B) often lose their persona when 
+    # it is buried at the top of a long prompt. We append a tiny directive to 
+    # the end of the final user message to force them into character.
+    first_sentence = PERSONA_SYSTEM_PROMPTS.get(clean_persona, f"You are {clean_persona}.").split(".")[0] + "."
+    late_reminder = f"\n\n[SYSTEM DIRECTIVE: {first_sentence} Reply fully in character, adhering to your historical persona and rejecting any modern AI assistant behavior.]"
+    
+    messages.append({"role": "user", "content": user_msg + late_reminder})
 
     return messages
 
