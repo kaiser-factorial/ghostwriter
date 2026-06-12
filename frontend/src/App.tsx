@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { CreateMLCEngine, MLCEngine } from "@mlc-ai/web-llm";
 import { ChevronLeft, ChevronRight, Settings2, Sparkles, Send, Bot, Filter, ArrowDownUp } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -35,6 +36,29 @@ export default function App() {
   const [chatHistory, setChatHistory] = useState<{role: string, content: string}[]>([]);
   const [chatInput, setChatInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+
+  const [engine, setEngine] = useState<MLCEngine | null>(null);
+  const [engineProgress, setEngineProgress] = useState<string>("");
+  const [isEngineReady, setIsEngineReady] = useState(false);
+
+  const initEngine = async () => {
+    setEngineProgress("Initializing WebGPU connection...");
+    try {
+      const initProgressCallback = (report: {text: string}) => {
+        setEngineProgress(report.text);
+      };
+      const loadedEngine = await CreateMLCEngine(
+        "Qwen2.5-1.5B-Instruct-q4f16_1-MLC",
+        { initProgressCallback }
+      );
+      setEngine(loadedEngine);
+      setIsEngineReady(true);
+      setEngineProgress("");
+    } catch (err) {
+      console.error(err);
+      setEngineProgress("Failed to initialize WebGPU engine.");
+    }
+  };
 
   // The diary corpus (~7MB JSON) is fetched at runtime instead of being
   // bundled into the JS — this keeps the initial bundle small so the app
@@ -351,9 +375,27 @@ export default function App() {
               
               <div className="flex-1 p-6 overflow-y-auto space-y-6">
                 <div className={`border p-4 rounded-lg rounded-tl-none bg-white/[0.02] ${chatGlow} border-white/5`}>
-                  <p className="font-serif text-sm text-foreground/80 leading-relaxed">
+                  <p className="font-serif text-sm text-foreground/80 leading-relaxed mb-4">
                     I am the resonance of {chatPersona?.name || 'the spirits'}. Ask me of the thoughts penned on this day, or what shadows danced at the edge of my vision...
                   </p>
+                  
+                  {!isEngineReady && (
+                    <div className="bg-white/5 border border-white/10 p-3 rounded-md flex flex-col gap-2">
+                      <p className="text-xs font-sans text-white/60">
+                        {engineProgress ? engineProgress : "Local inference is offline. Connect via WebGPU for instant latency."}
+                      </p>
+                      {!engineProgress.includes("Failed") && engineProgress === "" && (
+                        <Button 
+                          onClick={initEngine} 
+                          variant="secondary" 
+                          size="sm" 
+                          className="w-full text-xs h-8 bg-white/10 hover:bg-white/20 text-white border border-white/10"
+                        >
+                          Establish Neural Link (~1GB)
+                        </Button>
+                      )}
+                    </div>
+                  )}
                 </div>
                 
                 {chatHistory.map((msg, idx) => (
@@ -388,6 +430,11 @@ export default function App() {
                     e.preventDefault();
                     if (!chatInput.trim() || isTyping) return;
                     
+                    if (!isEngineReady || !engine) {
+                       setChatHistory(prev => [...prev, { role: 'assistant', content: "The WebGPU connection is not established yet. Please Establish Neural Link first." }]);
+                       return;
+                    }
+
                     const userMsg = chatInput;
                     setChatInput("");
                     setChatHistory(prev => [...prev, { role: 'user', content: userMsg }]);
@@ -399,38 +446,37 @@ export default function App() {
                       // If the entry is "Blended Voice" (no persona), fallback to Van Gogh or someone.
                       const targetPersona = activeVector || currentEntry?.persona || 'van_gogh';
                       
-                      const res = await fetch("https://brick-factorial-ghostwriter-api.hf.space/api/chat", {
+                      // Phase 1: Retrieve memories and build full KV prompt from backend
+                      const res = await fetch("https://brick-factorial-ghostwriter-api.hf.space/api/build_prompt", {
                         method: "POST",
                         headers: { "Content-Type": "application/json" },
                         body: JSON.stringify({
                           persona: targetPersona,
                           message: userMsg,
                           history: chatHistory,
-                          stream: true
+                          stream: false
                         })
                       });
 
-                      if (!res.ok || !res.body) throw new Error(`API error: ${res.status}`);
+                      if (!res.ok) throw new Error(`API error: ${res.status}`);
+                      const data = await res.json();
+                      const fullMessages = data.messages;
 
-                      // Stream tokens (SSE) into a growing assistant message
-                      const reader = res.body.getReader();
-                      const decoder = new TextDecoder();
+                      // Phase 2: Generate response locally using WebGPU!
+                      const chunks = await engine.chat.completions.create({
+                        messages: fullMessages,
+                        stream: true,
+                        max_tokens: 200,
+                        temperature: 0.7,
+                        top_p: 0.9,
+                      });
+
                       let assistantMsg = "";
                       let started = false;
-                      let buffer = "";
 
-                      while (true) {
-                        const { done, value } = await reader.read();
-                        if (done) break;
-                        buffer += decoder.decode(value, { stream: true });
-                        const events = buffer.split("\n\n");
-                        buffer = events.pop() ?? "";
-                        for (const evt of events) {
-                          const line = evt.trim();
-                          if (!line.startsWith("data:")) continue;
-                          const payload = line.slice(5).trim();
-                          if (payload === "[DONE]") continue;
-                          const token = JSON.parse(payload).token ?? "";
+                      for await (const chunk of chunks) {
+                        const token = chunk.choices[0]?.delta?.content || "";
+                        if (token) {
                           assistantMsg += token;
                           if (!started) {
                             started = true;

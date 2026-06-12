@@ -164,18 +164,20 @@ workstream. The duplicate-download collision is why `data/raw/` briefly held
 two copies of Pepys. Division of labor between strangers who are the same
 person turns out to be efficient.
 
+## Architecture Evolution (June 11)
+
+As the project expanded from a local CLI script to a full-stack application, the architecture evolved into a **Dual Model System** to handle the distinct requirements of UI interaction and raw text generation:
+
+1. **The Chatbot (Qwen2.5-3B-Instruct)**: Serves the interactive conversational interface. Because instruct models undergo heavy RLHF alignment to act like "helpful AI assistants," the persona system prompts alone weren't enough. We injected **Tailored Few-Shot Prompting** directly into the background chat history (`PERSONA_FEW_SHOTS`) to explicitly break the alignment. By providing hardcoded examples of the authors reacting dismissively, melodramatically, or poetically to modern requests (like writing an email), the model is forced into character.
+2. **The Generator (Qwen2.5-3B-Base, Fine-Tuned)**: Serves the pure journal-entry generation. Trained directly on the `trainE_Req.py` pipeline using raw text completions rather than ChatML, guaranteeing that the ghost's entries remain completely untainted by modern assistant formatting.
+
+### Deployment & Tooling
+- **Training Orchestration (`opbdh`)**: We integrated [opbdh](https://github.com/lumpenspace/opbdh) to fluidly dispatch the heavy fine-tuning jobs to RunPod GPU instances directly from the local CLI. The script `scripts/trainE_Req.py` automatically detects the OPBDH environment variables to handle paths and model selection.
+- **API Backend**: The backend is built with FastAPI + `llama-cpp-python` (for extremely efficient GGUF CPU inference) and deployed to a free **Hugging Face Docker Space**. Due to HF constraints on pushing large binaries via standard git, UI assets are either tracked with Git LFS or stripped out via isolated deployment branches (`hf-deploy`).
+- **Frontend UI**: Built with Vite, React, and Shadcn UI. Features multiple visual modes (Masonry, Carousel, Split-Pane, Timeline) for browsing the ghosts' memories.
+
 ## Next steps
 
-1. **RunPod run** (Corina): `bash` onto a pod, clone, `pip install -r
-   requirements.txt`, `python scripts/train.py --config
-   configs/train_qwen3b.yaml`. ~514K tokens × 2 epochs on an A100 ≈ minutes,
-   not hours. Tune `learning_rate` (2e-5 starting point; try 1e-5/3e-5),
-   `num_train_epochs` (2–4; watch val loss for the memorization knee), and
-   `persona_token_prob` upstream in the dataset if persona separation is weak.
-2. **Eval the séance**: blind-test persona mode (can you tell who's speaking?),
-   probe the blend for century-bleed, check date-conditioning (does a 1665
-   date summon plague-adjacent content? does 2026 confuse the ghost?).
-3. **OCR polish pass** on Mansfield if her voice comes out noisy (see
-   CLAUDE_IDEAS).
-4. Everything in CLAUDE_IDEAS.md's unimplemented section, which is where this
-   project gets weird.
+1. **Convert the Base Model to GGUF**: Once the current `opbdh` retraining finishes and the PyTorch/Safetensors weights are downloaded to `runpod_results/`, we need to write a `convert_to_gguf.sh` script to automate cloning `llama.cpp` and converting/quantizing the fine-tuned Base model into `.gguf` format.
+2. **Integrate the Dual Endpoints (`api.py`)**: Update the API backend (and its Hugging Face deployment) to load *both* the Instruct model and the new fine-tuned Base model into memory simultaneously. We will need to add a dedicated `/api/generate_entry` endpoint that bypasses ChatML formatting and uses raw text `create_completion` for the Base model.
+3. **Frontend Integration**: Hook up the new `generate_entry` endpoint in the React UI, allowing the user to seamlessly toggle between chatting with the ghost (Instruct model) and prompting them to write a brand new diary entry (Base model).

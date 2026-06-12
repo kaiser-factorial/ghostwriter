@@ -233,3 +233,17 @@ def chat_endpoint(req: ChatRequest):
     except Exception as e:
         logging.error(f"Error in chat endpoint: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/build_prompt")
+def build_prompt_endpoint(req: ChatRequest):
+    """
+    Returns the fully constructed messages array (including system prompts, few-shots, 
+    history, and retrieved memories) so that a client-side model (like WebLLM) 
+    can execute the inference locally.
+    """
+    try:
+        messages = build_messages(req)
+        return {"messages": messages}
+    except Exception as e:
+        logging.error(f"Error in build_prompt endpoint: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
