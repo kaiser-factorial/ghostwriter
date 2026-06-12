@@ -41,7 +41,7 @@ print("Loading model into memory...")
 llm = Llama(
     model_path=model_path,
     n_ctx=4096,
-    n_threads=os.cpu_count(),
+    n_threads=int(os.environ.get("N_THREADS", 2)), # Prevent CPU thrashing on HF Spaces
     n_gpu_layers=-1,  # Automatically offload layers to GPU if available
     verbose=False,
 )
@@ -137,15 +137,15 @@ def get_relevant_memories(query: str, persona: str, num_memories: int = 3) -> li
 
 def build_messages(req: ChatRequest) -> list[dict]:
     user_msg = req.message
-    # Keep only the last 10 messages to prevent context overflow from long chats
-    history_dicts = [{"role": m.role, "content": m.content} for m in req.history[-10:]]
+    # Keep only the last 6 messages to prevent long prompt evaluations on CPU
+    history_dicts = [{"role": m.role, "content": m.content} for m in req.history[-6:]]
 
     # Retrieval query: the user message plus a little recent context. This
     # replaces the old LLM-based query reformulation, which cost a full extra
     # model call (prompt processing + generation) per request.
     recent_context = " ".join(m["content"] for m in history_dicts[-2:])
     search_query = f"{recent_context} {user_msg}".strip()
-    memories = get_relevant_memories(search_query, req.persona, num_memories=3)
+    memories = get_relevant_memories(search_query, req.persona, num_memories=2)
 
     clean_persona = req.persona.replace("_", "").lower()
     base_sys_prompt = PERSONA_SYSTEM_PROMPTS.get(clean_persona, f"You are {clean_persona}.")
@@ -163,9 +163,9 @@ def build_messages(req: ChatRequest) -> list[dict]:
     # inside the user message to prevent the model from breaking character 
     # and answering like an AI assistant.
     if memories:
-        # Truncate each memory to ~1000 characters to prevent context window overflow
-        # (Some diary entries in the corpus are 20,000+ characters long)
-        truncated_memories = [m[:1000] + ("..." if len(m) > 1000 else "") for m in memories]
+        # Truncate each memory to ~600 characters to prevent context window overflow
+        # and to speed up prompt evaluation on CPU instances
+        truncated_memories = [m[:600] + ("..." if len(m) > 600 else "") for m in memories]
         ctx_str = "\n\n".join(f"--- DIARY ENTRY ---\n{c}" for c in truncated_memories)
         messages.append({
             "role": "system",
