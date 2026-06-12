@@ -4,8 +4,8 @@ import react from '@vitejs/plugin-react'
 
 // https://vite.dev/config/
 export default defineConfig({
-  // Project pages are served from https://<user>.github.io/ghost-diary/
-  base: process.env.GITHUB_ACTIONS ? "/ghost-diary/" : "/",
+  // Project pages are served from https://<user>.github.io/ghostwriter/
+  base: process.env.GITHUB_ACTIONS ? "/ghostwriter/" : "/",
   plugins: [react()],
   resolve: {
     alias: {

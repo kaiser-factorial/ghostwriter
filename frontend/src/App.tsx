@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronLeft, ChevronRight, Settings2, Sparkles, Send, Bot, Filter, ArrowDownUp } from 'lucide-react';
 
@@ -7,7 +7,13 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from '@/components/ui/context-menu';
 
-import rawEntries from './entries.json';
+interface Entry {
+  persona: string;
+  date: string | null;
+  synthetic_date?: boolean;
+  title: string | null;
+  text: string;
+}
 
 // Persona mappings & Chameleon Colors
 const PERSONAS: Record<string, { name: string, color: string, glow: string }> = {
@@ -30,6 +36,18 @@ export default function App() {
   const [chatInput, setChatInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
 
+  // The diary corpus (~7MB JSON) is fetched at runtime instead of being
+  // bundled into the JS — this keeps the initial bundle small so the app
+  // shell paints immediately. The browser caches it after first load.
+  const [rawEntries, setRawEntries] = useState<Entry[]>([]);
+  const [entriesError, setEntriesError] = useState(false);
+  useEffect(() => {
+    fetch(`${import.meta.env.BASE_URL}entries.json`)
+      .then(res => { if (!res.ok) throw new Error(`${res.status}`); return res.json(); })
+      .then((data: Entry[]) => setRawEntries(data))
+      .catch(err => { console.error("Failed to load entries:", err); setEntriesError(true); });
+  }, []);
+
   const entries = useMemo(() => {
     let filtered = activeFilter ? rawEntries.filter((e: any) => e.persona === activeFilter) : [...rawEntries];
     if (sortOrder === 'desc') {
@@ -49,6 +67,16 @@ export default function App() {
 
   const handleNext = () => setCurrentIndex(i => Math.min(i + 1, entries.length - 1));
   const handlePrev = () => setCurrentIndex(i => Math.max(i - 1, 0));
+
+  if (rawEntries.length === 0) {
+    return (
+      <div className="h-screen w-full bg-background flex items-center justify-center text-foreground">
+        <p className="font-serif text-lg tracking-widest uppercase text-primary/50 animate-pulse">
+          {entriesError ? "The archive could not be reached..." : "Summoning the archive..."}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <TooltipProvider>
