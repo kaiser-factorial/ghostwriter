@@ -149,7 +149,7 @@ def build_messages(req: ChatRequest) -> list[dict]:
 
     clean_persona = req.persona.replace("_", "").lower()
     base_sys_prompt = PERSONA_SYSTEM_PROMPTS.get(clean_persona, f"You are {clean_persona}.")
-    base_sys_prompt += " Try to keep your responses relatively concise (1-3 short paragraphs) to maintain a natural conversational flow, unless you feel the user's message should yield a lengthier response."
+    base_sys_prompt += " IMPORTANT: You must keep your responses very short and concise (1-2 short paragraphs maximum) unless absolutely necessary."
     few_shots = PERSONA_FEW_SHOTS.get(clean_persona, [])
 
     messages = [{"role": "system", "content": base_sys_prompt}] + few_shots + history_dicts
@@ -177,7 +177,9 @@ def build_messages(req: ChatRequest) -> list[dict]:
     return messages
 
 
-GEN_KWARGS = dict(max_tokens=300, temperature=0.7, top_p=0.9)
+import time
+
+GEN_KWARGS = dict(max_tokens=200, temperature=0.7, top_p=0.9)
 
 
 @app.get("/")
@@ -188,6 +190,7 @@ def read_root():
 @app.post("/api/chat")
 def chat_endpoint(req: ChatRequest):
     try:
+        req_start_time = time.time()
         print(f"\n--- New Request --- persona={req.persona} stream={req.stream} history_len={len(req.history)}", flush=True)
         print(f"Message: {req.message[:200]!r}", flush=True)
         messages = build_messages(req)
@@ -195,6 +198,7 @@ def chat_endpoint(req: ChatRequest):
         if req.stream:
             def token_stream():
                 n_tokens = 0
+                first_token_time = None
                 with llm_lock:
                     print("Generating (streaming)...", flush=True)
                     for chunk in llm.create_chat_completion(
@@ -203,9 +207,15 @@ def chat_endpoint(req: ChatRequest):
                         delta = chunk["choices"][0]["delta"]
                         token = delta.get("content")
                         if token:
+                            if first_token_time is None:
+                                first_token_time = time.time()
+                                ttft = first_token_time - req_start_time
+                                print(f"Time To First Token (TTFT): {ttft:.2f} seconds", flush=True)
                             n_tokens += 1
                             yield f"data: {json.dumps({'token': token})}\n\n"
-                print(f"Done streaming ({n_tokens} chunks).", flush=True)
+                
+                total_time = time.time() - req_start_time
+                print(f"Done streaming ({n_tokens} chunks). Total time: {total_time:.2f} seconds.", flush=True)
                 yield "data: [DONE]\n\n"
 
             return StreamingResponse(
@@ -217,7 +227,8 @@ def chat_endpoint(req: ChatRequest):
         with llm_lock:
             response = llm.create_chat_completion(messages=messages, **GEN_KWARGS)
         response_text = response["choices"][0]["message"]["content"].strip()
-        print("Done! Sending back to frontend.", flush=True)
+        total_time = time.time() - req_start_time
+        print(f"Done! Total time: {total_time:.2f} seconds.", flush=True)
         return {"response": response_text}
     except Exception as e:
         logging.error(f"Error in chat endpoint: {e}")
