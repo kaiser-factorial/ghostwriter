@@ -149,7 +149,7 @@ def build_messages(req: ChatRequest) -> list[dict]:
 
     clean_persona = req.persona.replace("_", "").lower()
     base_sys_prompt = PERSONA_SYSTEM_PROMPTS.get(clean_persona, f"You are {clean_persona}.")
-    base_sys_prompt += " Keep your responses relatively concise (1-3 short paragraphs) to maintain a natural conversational flow."
+    base_sys_prompt += " Try to keep your responses relatively concise (1-3 short paragraphs) to maintain a natural conversational flow, unless you feel the user's message should yield a lengthier response."
     few_shots = PERSONA_FEW_SHOTS.get(clean_persona, [])
 
     messages = [{"role": "system", "content": base_sys_prompt}] + few_shots + history_dicts
