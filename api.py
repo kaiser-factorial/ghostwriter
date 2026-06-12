@@ -137,7 +137,8 @@ def get_relevant_memories(query: str, persona: str, num_memories: int = 3) -> li
 
 def build_messages(req: ChatRequest) -> list[dict]:
     user_msg = req.message
-    history_dicts = [{"role": m.role, "content": m.content} for m in req.history]
+    # Keep only the last 10 messages to prevent context overflow from long chats
+    history_dicts = [{"role": m.role, "content": m.content} for m in req.history[-10:]]
 
     # Retrieval query: the user message plus a little recent context. This
     # replaces the old LLM-based query reformulation, which cost a full extra
@@ -157,7 +158,10 @@ def build_messages(req: ChatRequest) -> list[dict]:
     # message instead of the system prompt — putting them at position 0 would
     # invalidate the entire cache on every request.
     if memories:
-        ctx_str = "\n\n".join(f"--- MEMORY ---\n{c}" for c in memories)
+        # Truncate each memory to ~1000 characters to prevent context window overflow
+        # (Some diary entries in the corpus are 20,000+ characters long)
+        truncated_memories = [m[:1000] + ("..." if len(m) > 1000 else "") for m in memories]
+        ctx_str = "\n\n".join(f"--- MEMORY ---\n{c}" for c in truncated_memories)
         final_user_content = (
             f"[Private memories of yours that surface as you read this — draw on "
             f"them naturally, never mention them as 'memories':\n\n{ctx_str}]\n\n{user_msg}"
@@ -184,19 +188,24 @@ def read_root():
 @app.post("/api/chat")
 def chat_endpoint(req: ChatRequest):
     try:
-        print(f"\n--- New Request --- persona={req.persona} stream={req.stream}", flush=True)
+        print(f"\n--- New Request --- persona={req.persona} stream={req.stream} history_len={len(req.history)}", flush=True)
+        print(f"Message: {req.message[:200]!r}", flush=True)
         messages = build_messages(req)
 
         if req.stream:
             def token_stream():
+                n_tokens = 0
                 with llm_lock:
+                    print("Generating (streaming)...", flush=True)
                     for chunk in llm.create_chat_completion(
                         messages=messages, stream=True, **GEN_KWARGS
                     ):
                         delta = chunk["choices"][0]["delta"]
                         token = delta.get("content")
                         if token:
+                            n_tokens += 1
                             yield f"data: {json.dumps({'token': token})}\n\n"
+                print(f"Done streaming ({n_tokens} chunks).", flush=True)
                 yield "data: [DONE]\n\n"
 
             return StreamingResponse(
