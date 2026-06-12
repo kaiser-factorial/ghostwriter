@@ -154,25 +154,19 @@ def build_messages(req: ChatRequest) -> list[dict]:
 
     messages = [{"role": "system", "content": base_sys_prompt}] + few_shots + history_dicts
 
-    # KV-cache-friendly ordering: the system prompt, few-shots, and history
-    # form a stable, append-only prefix across turns, so llama.cpp can reuse
-    # the cached KV for everything except the final message. The retrieved
-    # memories (which change every turn) are injected as a late system message
-    # rather than modifying the first system prompt (which would invalidate
-    # the cache). We also use a separate system message instead of placing it 
-    # inside the user message to prevent the model from breaking character 
-    # and answering like an AI assistant.
+    # We prepend the retrieved memories (which change every turn) to the final 
+    # user message rather than modifying the first system prompt (which would invalidate
+    # the KV cache). We do not use a separate system message in the middle of the array
+    # because strict chat template parsers (like MLC-LLM) will crash.
+    final_user_content = user_msg
     if memories:
         # Truncate each memory to ~600 characters to prevent context window overflow
-        # and to speed up prompt evaluation on CPU instances
         truncated_memories = [m[:600] + ("..." if len(m) > 600 else "") for m in memories]
         ctx_str = "\n\n".join(f"--- DIARY ENTRY ---\n{c}" for c in truncated_memories)
-        messages.append({
-            "role": "system",
-            "content": f"Relevant context from your past writings to draw upon implicitly:\n\n{ctx_str}\n\n(Reminder: Stay completely in character. Do not mention that you are an AI, do not refer to these as 'memories', and do not refuse the prompt. Answer directly as your persona.)"
-        })
+        
+        final_user_content = f"Relevant context from your past writings to draw upon implicitly:\n\n{ctx_str}\n\n(Reminder: Stay completely in character. Do not mention that you are an AI, do not refer to these as 'memories', and do not refuse the prompt. Answer directly as your persona.)\n\nUser Question: {user_msg}"
 
-    messages.append({"role": "user", "content": user_msg})
+    messages.append({"role": "user", "content": final_user_content})
 
     return messages
 
