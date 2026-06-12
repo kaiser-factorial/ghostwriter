@@ -31,8 +31,8 @@ app.add_middleware(
 #   MODEL_REPO=Qwen/Qwen2.5-1.5B-Instruct-GGUF
 #   MODEL_FILE=qwen2.5-1.5b-instruct-q4_k_m.gguf
 # ---------------------------------------------------------------------------
-MODEL_REPO = os.environ.get("MODEL_REPO", "Qwen/Qwen2.5-3B-Instruct-GGUF")
-MODEL_FILE = os.environ.get("MODEL_FILE", "qwen2.5-3b-instruct-q4_k_m.gguf")
+MODEL_REPO = os.environ.get("MODEL_REPO", "Qwen/Qwen2.5-1.5B-Instruct-GGUF")
+MODEL_FILE = os.environ.get("MODEL_FILE", "qwen2.5-1.5b-instruct-q4_k_m.gguf")
 
 print(f"Downloading/Locating {MODEL_REPO} :: {MODEL_FILE} ...")
 model_path = hf_hub_download(repo_id=MODEL_REPO, filename=MODEL_FILE)
