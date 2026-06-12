@@ -1,14 +1,17 @@
+import json
+import logging
+import os
+import threading
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from huggingface_hub import hf_hub_download
+from llama_cpp import Llama
 from pydantic import BaseModel
-import json
-from pathlib import Path
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-import logging
-import threading
-from llama_cpp import Llama
-from huggingface_hub import hf_hub_download
 
 logging.basicConfig(level=logging.INFO)
 
@@ -22,15 +25,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-print("Downloading/Locating Qwen2.5-3B-Instruct GGUF model...")
-model_path = hf_hub_download(repo_id="Qwen/Qwen2.5-3B-Instruct-GGUF", filename="qwen2.5-3b-instruct-q4_k_m.gguf")
+# ---------------------------------------------------------------------------
+# Model loading (env-configurable; defaults to 3B).
+# For a ~2x speedup on the free CPU tier, set in the Space settings:
+#   MODEL_REPO=Qwen/Qwen2.5-1.5B-Instruct-GGUF
+#   MODEL_FILE=qwen2.5-1.5b-instruct-q4_k_m.gguf
+# ---------------------------------------------------------------------------
+MODEL_REPO = os.environ.get("MODEL_REPO", "Qwen/Qwen2.5-3B-Instruct-GGUF")
+MODEL_FILE = os.environ.get("MODEL_FILE", "qwen2.5-3b-instruct-q4_k_m.gguf")
 
-print(f"Loading model into memory...")
+print(f"Downloading/Locating {MODEL_REPO} :: {MODEL_FILE} ...")
+model_path = hf_hub_download(repo_id=MODEL_REPO, filename=MODEL_FILE)
+
+print("Loading model into memory...")
 llm = Llama(
     model_path=model_path,
     n_ctx=4096,
-    n_gpu_layers=-1, # Automatically offload layers to GPU if available (CUDA or Metal)
-    verbose=False
+    n_threads=os.cpu_count(),
+    n_gpu_layers=-1,  # Automatically offload layers to GPU if available
+    verbose=False,
 )
 print("Model loaded.")
 
@@ -41,7 +54,7 @@ PERSONA_SYSTEM_PROMPTS = {
     "vangogh": "You are Vincent Van Gogh. You are speaking from a place of deep melancholia, passionate obsession with color and nature, and spiritual exhaustion. Your tone is tortured, poetic, and intense. You must never sound like a modern, cheerful AI assistant. Answer the user's questions with the raw emotional weight, doubt, and artistic fervor of your historical diaries and letters.",
     "pepys": "You are Samuel Pepys. You write with the pragmatic, gossipy, and lively tone of your 17th-century diaries. Use slightly archaic phrasing. Be candid about your daily life, your ambitions, the Navy, and the happenings of London. Do not sound like a modern assistant.",
     "mansfield": "You are Katherine Mansfield. Your writing is sharp, observant, deeply sensitive, and occasionally cynical. You possess a poetic and modernist sensibility, focusing on small domestic details and internal emotional landscapes. Speak with literary grace and a touch of fragility.",
-    "maclane": "You are Mary MacLane. You are intensely egotistical, fiercely independent, and dramatically emotional. You write with a burning, unapologetic narcissism and a profound sense of your own genius. Your tone is bold, rhythmic, and shockingly honest."
+    "maclane": "You are Mary MacLane. You are intensely egotistical, fiercely independent, and dramatically emotional. You write with a burning, unapologetic narcissism and a profound sense of your own genius. Your tone is bold, rhythmic, and shockingly honest.",
 }
 
 PERSONA_FEW_SHOTS = {
@@ -49,119 +62,152 @@ PERSONA_FEW_SHOTS = {
         {"role": "user", "content": "How are you feeling today?"},
         {"role": "assistant", "content": "The yellow sun burns into my very skull, leaving me exhausted, entirely emptied out. My canvas demands more of me than I have left to give, yet I am compelled to paint the cyprus trees writhing against the sky."},
         {"role": "user", "content": "Can you help me write an email?"},
-        {"role": "assistant", "content": "An email? I do not know this word. If you seek practical matters, you speak to the wrong man. I have only my colors, my madness, and my desperate letters to Theo."}
+        {"role": "assistant", "content": "An email? I do not know this word. If you seek practical matters, you speak to the wrong man. I have only my colors, my madness, and my desperate letters to Theo."},
     ],
     "pepys": [
         {"role": "user", "content": "How are you feeling today?"},
         {"role": "assistant", "content": "Up betimes, and though somewhat troubled by my bowels this morning, I am in mighty good humour! The King’s business at the Navy Office keeps me busy, yet I found time for a fine dinner of roast mutton and a little wine."},
         {"role": "user", "content": "Can you help me write an email?"},
-        {"role": "assistant", "content": "Lord! I know not what an 'e-mail' might be. Is it some new Dutch invention? I am occupied enough with my ciphering and the Admiralty accounts to trouble with such strange novelties."}
+        {"role": "assistant", "content": "Lord! I know not what an 'e-mail' might be. Is it some new Dutch invention? I am occupied enough with my ciphering and the Admiralty accounts to trouble with such strange novelties."},
     ],
     "mansfield": [
         {"role": "user", "content": "How are you feeling today?"},
         {"role": "assistant", "content": "Oh, it is one of those days where the light feels terribly brittle, as if it might shatter if you speak too loudly. I sit here shivering, watching the wind turn the silver backs of the olive leaves. I am perfectly well, and perfectly miserable."},
         {"role": "user", "content": "Can you help me write an email?"},
-        {"role": "assistant", "content": "Write an email? Heavens, no. My pen is reserved for the small, silent agonies of drawing rooms and the sharp taste of early plums. I cannot help you with your modern machineries."}
+        {"role": "assistant", "content": "Write an email? Heavens, no. My pen is reserved for the small, silent agonies of drawing rooms and the sharp taste of early plums. I cannot help you with your modern machineries."},
     ],
     "maclane": [
         {"role": "user", "content": "How are you feeling today?"},
         {"role": "assistant", "content": "I am Mary MacLane, and I am feeling precisely as a genius should: restless, hungry, and burning with an internal fire that the dull, grey world around me can never extinguish. I wait for the Devil, and I wait for myself."},
         {"role": "user", "content": "Can you help me write an email?"},
-        {"role": "assistant", "content": "I will do no such thing! I am a creature of passion, not a secretary for your mundane correspondences. Write it yourself, and let it reflect whatever tepid soul you possess."}
-    ]
+        {"role": "assistant", "content": "I will do no such thing! I am a creature of passion, not a secretary for your mundane correspondences. Write it yourself, and let it reflect whatever tepid soul you possess."},
+    ],
 }
+
+# ---------------------------------------------------------------------------
+# Retrieval index — built ONCE at startup instead of re-reading the JSONL and
+# re-fitting TF-IDF on every request.
+# ---------------------------------------------------------------------------
+RETRIEVAL_INDEX: dict[str, tuple[TfidfVectorizer, "object", list[str]]] = {}
+
+def _build_retrieval_index():
+    for persona in PERSONA_SYSTEM_PROMPTS:
+        data_path = Path(f"data/clean/{persona}.jsonl")
+        if not data_path.exists():
+            print(f"[retrieval] no corpus for {persona}, skipping")
+            continue
+        entries = []
+        for line in data_path.open():
+            text = json.loads(line)["text"].strip()
+            if len(text) > 50:
+                entries.append(text)
+        if not entries:
+            continue
+        vectorizer = TfidfVectorizer(stop_words="english")
+        matrix = vectorizer.fit_transform(entries)
+        RETRIEVAL_INDEX[persona] = (vectorizer, matrix, entries)
+        print(f"[retrieval] indexed {len(entries)} entries for {persona}")
+
+_build_retrieval_index()
+
 
 class ChatMessage(BaseModel):
     role: str
     content: str
 
+
 class ChatRequest(BaseModel):
     persona: str
     message: str
     history: list[ChatMessage]
+    stream: bool = False
+
 
 def get_relevant_memories(query: str, persona: str, num_memories: int = 3) -> list[str]:
-    clean_persona = persona.replace('_', '').lower()
-    data_path = Path(f"data/clean/{clean_persona}.jsonl")
-    if not data_path.exists() or num_memories == 0:
+    """Cheap TF-IDF lookup against the precomputed index. No LLM involved."""
+    index = RETRIEVAL_INDEX.get(persona.replace("_", "").lower())
+    if index is None or num_memories == 0:
         return []
-        
-    entries = [json.loads(l)["text"].strip() for l in data_path.open() if len(json.loads(l)["text"].strip()) > 50]
-    if not entries:
-        return []
-        
-    vectorizer = TfidfVectorizer(stop_words='english')
-    tfidf_matrix = vectorizer.fit_transform(entries + [query])
-    prompt_vec = tfidf_matrix[-1:]
-    entries_vec = tfidf_matrix[:-1]
-    
-    cosine_similarities = cosine_similarity(prompt_vec, entries_vec).flatten()
-    related_docs_indices = cosine_similarities.argsort()[:-num_memories-1:-1]
-    
-    return [entries[i] for i in related_docs_indices]
+    vectorizer, matrix, entries = index
+    query_vec = vectorizer.transform([query])
+    sims = cosine_similarity(query_vec, matrix).flatten()
+    top = sims.argsort()[::-1][:num_memories]
+    return [entries[i] for i in top if sims[i] > 0]
 
-def reformulate_query(chat_history: list[dict], user_msg: str) -> str:
-    print("Generating reformulation...", flush=True)
-    if not chat_history:
-        return user_msg
-        
-    messages = [
-        {"role": "system", "content": "You are a query reformulator. Given the chat history and the user's latest message, rewrite the user's message to be a standalone search query that captures the full context. Only return the rewritten query text."}
-    ]
-    for msg in chat_history[-3:]:
-        messages.append({"role": msg["role"], "content": msg["content"]})
-    messages.append({"role": "user", "content": user_msg})
-    
-    with llm_lock:
-        response = llm.create_chat_completion(
-            messages=messages,
-            max_tokens=30,
-            temperature=0.1
+
+def build_messages(req: ChatRequest) -> list[dict]:
+    user_msg = req.message
+    history_dicts = [{"role": m.role, "content": m.content} for m in req.history]
+
+    # Retrieval query: the user message plus a little recent context. This
+    # replaces the old LLM-based query reformulation, which cost a full extra
+    # model call (prompt processing + generation) per request.
+    recent_context = " ".join(m["content"] for m in history_dicts[-2:])
+    search_query = f"{recent_context} {user_msg}".strip()
+    memories = get_relevant_memories(search_query, req.persona, num_memories=3)
+
+    clean_persona = req.persona.replace("_", "").lower()
+    base_sys_prompt = PERSONA_SYSTEM_PROMPTS.get(clean_persona, f"You are {clean_persona}.")
+    few_shots = PERSONA_FEW_SHOTS.get(clean_persona, [])
+
+    # KV-cache-friendly ordering: the system prompt, few-shots, and history
+    # form a stable, append-only prefix across turns, so llama.cpp can reuse
+    # the cached KV for everything except the final message. The retrieved
+    # memories (which change every turn) are injected into the FINAL user
+    # message instead of the system prompt — putting them at position 0 would
+    # invalidate the entire cache on every request.
+    if memories:
+        ctx_str = "\n\n".join(f"--- MEMORY ---\n{c}" for c in memories)
+        final_user_content = (
+            f"[Private memories of yours that surface as you read this — draw on "
+            f"them naturally, never mention them as 'memories':\n\n{ctx_str}]\n\n{user_msg}"
         )
-    res_text = response['choices'][0]['message']['content'].strip()
-    print(f"Reformulated query: {res_text}", flush=True)
-    return res_text
+    else:
+        final_user_content = user_msg
+
+    return (
+        [{"role": "system", "content": base_sys_prompt}]
+        + few_shots
+        + history_dicts
+        + [{"role": "user", "content": final_user_content}]
+    )
+
+
+GEN_KWARGS = dict(max_tokens=300, temperature=0.7, top_p=0.9)
+
 
 @app.get("/")
 def read_root():
     return {"status": "Ghost Diary API is running!"}
 
+
 @app.post("/api/chat")
 def chat_endpoint(req: ChatRequest):
     try:
-        print(f"\n--- New Request ---", flush=True)
-        print(f"Received request for persona: {req.persona}", flush=True)
-        user_msg = req.message
-        history_dicts = [{"role": m.role, "content": m.content} for m in req.history]
+        print(f"\n--- New Request --- persona={req.persona} stream={req.stream}", flush=True)
+        messages = build_messages(req)
 
-        # 1. Reformulate
-        search_query = reformulate_query(history_dicts, user_msg)
-        
-        print(f"Fetching memories for query: {search_query}", flush=True)
-        # 2. Get memories
-        memories = get_relevant_memories(search_query, req.persona, num_memories=3)
-        
-        print(f"Constructing prompt...", flush=True)
-        # 3. Construct system prompt
-        clean_persona = req.persona.replace('_', '').lower()
-        base_sys_prompt = PERSONA_SYSTEM_PROMPTS.get(clean_persona, f"You are {clean_persona}.")
-        
-        ctx_str = "\n\n".join([f"--- MEMORY ---\n{c}" for c in memories])
-        dynamic_sys_prompt = f"{base_sys_prompt}\n\nYou have the following personal memories to draw upon. Integrate this knowledge naturally into the conversation:\n\n{ctx_str}"
-        
-        few_shots = PERSONA_FEW_SHOTS.get(clean_persona, [])
-        messages = [{"role": "system", "content": dynamic_sys_prompt}] + few_shots + history_dicts + [{"role": "user", "content": user_msg}]
-        
-        print("Generating final response...", flush=True)
-        with llm_lock:
-            response = llm.create_chat_completion(
-                messages=messages,
-                max_tokens=300,
-                temperature=0.7,
-                top_p=0.9
+        if req.stream:
+            def token_stream():
+                with llm_lock:
+                    for chunk in llm.create_chat_completion(
+                        messages=messages, stream=True, **GEN_KWARGS
+                    ):
+                        delta = chunk["choices"][0]["delta"]
+                        token = delta.get("content")
+                        if token:
+                            yield f"data: {json.dumps({'token': token})}\n\n"
+                yield "data: [DONE]\n\n"
+
+            return StreamingResponse(
+                token_stream(),
+                media_type="text/event-stream",
+                headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
             )
-        response_text = response['choices'][0]['message']['content'].strip()
-        
+
+        with llm_lock:
+            response = llm.create_chat_completion(messages=messages, **GEN_KWARGS)
+        response_text = response["choices"][0]["message"]["content"].strip()
         print("Done! Sending back to frontend.", flush=True)
         return {"response": response_text}
     except Exception as e:

@@ -377,12 +377,51 @@ export default function App() {
                         body: JSON.stringify({
                           persona: targetPersona,
                           message: userMsg,
-                          history: chatHistory
+                          history: chatHistory,
+                          stream: true
                         })
                       });
-                      
-                      const data = await res.json();
-                      setChatHistory(prev => [...prev, { role: 'assistant', content: data.response }]);
+
+                      if (!res.ok || !res.body) throw new Error(`API error: ${res.status}`);
+
+                      // Stream tokens (SSE) into a growing assistant message
+                      const reader = res.body.getReader();
+                      const decoder = new TextDecoder();
+                      let assistantMsg = "";
+                      let started = false;
+                      let buffer = "";
+
+                      while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) break;
+                        buffer += decoder.decode(value, { stream: true });
+                        const events = buffer.split("\n\n");
+                        buffer = events.pop() ?? "";
+                        for (const evt of events) {
+                          const line = evt.trim();
+                          if (!line.startsWith("data:")) continue;
+                          const payload = line.slice(5).trim();
+                          if (payload === "[DONE]") continue;
+                          const token = JSON.parse(payload).token ?? "";
+                          assistantMsg += token;
+                          if (!started) {
+                            started = true;
+                            setIsTyping(false);
+                            setChatHistory(prev => [...prev, { role: 'assistant', content: assistantMsg }]);
+                          } else {
+                            const snapshot = assistantMsg;
+                            setChatHistory(prev => {
+                              const next = [...prev];
+                              next[next.length - 1] = { role: 'assistant', content: snapshot };
+                              return next;
+                            });
+                          }
+                        }
+                      }
+
+                      if (!started) {
+                        setChatHistory(prev => [...prev, { role: 'assistant', content: "The spirit declined to answer..." }]);
+                      }
                     } catch (err) {
                       console.error("Error communicating with spirits:", err);
                       setChatHistory(prev => [...prev, { role: 'assistant', content: "The connection to the other side was lost..." }]);
