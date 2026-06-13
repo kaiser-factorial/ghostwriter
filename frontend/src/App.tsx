@@ -1,7 +1,11 @@
 import { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CreateMLCEngine, MLCEngine } from "@mlc-ai/web-llm";
-import { ChevronLeft, ChevronRight, Settings2, Sparkles, Send, Bot, Filter, ArrowDownUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Settings2, Sparkles, Send, Bot, Filter, ArrowDownUp, PenLine, X } from 'lucide-react';
+import { collection, addDoc } from 'firebase/firestore';
+
+import { db } from './lib/firebase';
+import { useAgentTelemetry } from './hooks/useAgentTelemetry';
 
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
@@ -40,6 +44,38 @@ export default function App() {
   const [engine, setEngine] = useState<MLCEngine | null>(null);
   const [engineProgress, setEngineProgress] = useState<string>("");
   const [isEngineReady, setIsEngineReady] = useState(false);
+
+  const [isWriting, setIsWriting] = useState(false);
+  const [composeText, setComposeText] = useState("");
+
+  const { flushTrajectory } = useAgentTelemetry(async (trajectory) => {
+    try {
+      await addDoc(collection(db, "trajectories"), {
+        timestamp: Date.now(),
+        data: trajectory
+      });
+      console.log("Trajectory pushed to Firebase!");
+    } catch (e) {
+      console.error("Error saving trajectory: ", e);
+    }
+  });
+
+  const handleSubmitEntry = async () => {
+    if (!composeText.trim()) return;
+    try {
+      // 1. Save the actual journal entry
+      await addDoc(collection(db, "community_entries"), {
+        text: composeText,
+        timestamp: Date.now()
+      });
+      // 2. Flush the telemetry (which uploads the actions the user took to get here)
+      flushTrajectory();
+      setComposeText("");
+      setIsWriting(false);
+    } catch (e) {
+      console.error("Error saving entry: ", e);
+    }
+  };
 
   const initEngine = async () => {
     setEngineProgress("Initializing WebGPU connection...");
@@ -218,8 +254,12 @@ export default function App() {
           
           <div className="flex-1 overflow-y-auto px-12 py-24 flex flex-col items-center">
             
-            <div className="w-full max-w-2xl mb-12 flex justify-center">
+            <div className="w-full max-w-2xl mb-12 flex justify-between items-center px-4">
+              <div className="w-8" /> {/* spacer */}
               <h1 className="text-2xl font-serif tracking-widest text-primary/80 uppercase">Ghostwriter</h1>
+              <Button variant="ghost" size="icon" onClick={() => setIsWriting(!isWriting)} className="rounded-full h-10 w-10 hover:bg-white/5">
+                {isWriting ? <X className="w-5 h-5 text-white/60" /> : <PenLine className="w-5 h-5 text-white/60" />}
+              </Button>
             </div>
 
             <ContextMenu>
@@ -293,6 +333,31 @@ export default function App() {
                 ))}
               </ContextMenuContent>
             </ContextMenu>
+            
+            {isWriting && (
+              <div className="absolute inset-0 bg-background/80 backdrop-blur-md z-50 flex items-center justify-center p-8">
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 20 }}
+                  className="w-full max-w-2xl bg-black/40 border border-white/10 rounded-2xl p-6 shadow-2xl flex flex-col gap-4"
+                >
+                  <h2 className="font-serif text-xl tracking-widest text-primary/80 uppercase mb-2">Pen a Memory</h2>
+                  <textarea 
+                    value={composeText}
+                    onChange={(e) => setComposeText(e.target.value)}
+                    placeholder="Set down the truth of this day..."
+                    className="w-full h-64 bg-white/5 border border-white/10 rounded-xl p-4 font-serif text-lg text-white/90 focus:outline-none focus:ring-1 focus:ring-white/20 resize-none"
+                  />
+                  <div className="flex justify-end gap-3 mt-2">
+                    <Button variant="ghost" onClick={() => setIsWriting(false)}>Cancel</Button>
+                    <Button onClick={handleSubmitEntry} className="bg-white/10 hover:bg-white/20 text-white border border-white/10">
+                      Submit to the Void
+                    </Button>
+                  </div>
+                </motion.div>
+              </div>
+            )}
             
           </div>
 
